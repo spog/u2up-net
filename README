@@ -1,0 +1,57 @@
+U2UP-NET SOFTWARE PROJECT
+=========================
+
+--------------------------------------------------------------------
+   Copyright 2019 Samo Pogacnik <samo_pogacnik@t-2.net>
+
+The U2UP-NET software project is provided under the terms of the
+GNU Affero General Public License version 3, which is available in
+the LICENSE file of this project.
+--------------------------------------------------------------------
+
+The U2UP-NET software is a "small-world-phenomenon" research attempt to
+provide a sample network simulation and individual network node skeleton.
+
+Features:
+=========
+- Check "design-notes" under docs...
+
+Building:
+=========
+
+Configure:
+----------
+samo@hp450g3:~/Code/U2UP/u2up-net$ 
+samo@hp450g3:~/Code/U2UP/u2up-net$ env BUILDIR=./build PREFIX=/usr ./configure
+...
+samo@hp450g3:~/Code/U2UP/u2up-net$ 
+
+Make:
+-----
+samo@hp450g3:~/Code/U2UP/u2up-net$ 
+samo@hp450g3:~/Code/U2UP/u2up-net$ make
+...
+samo@hp450g3:~/Code/U2UP/u2up-net$ 
+
+Install:
+--------
+samo@hp450g3:~/Code/U2UP/u2up-net$ 
+samo@hp450g3:~/Code/U2UP/u2up-net$ env DESTDIR=$(pwd)/install make install
+...
+samo@hp450g3:~/Code/U2UP/u2up-net$ 
+
+Clean:
+------
+samo@hp450g3:~/Code/U2UP/u2up-net$ 
+samo@hp450g3:~/Code/U2UP/u2up-net$ make clean
+...
+samo@hp450g3:~/Code/U2UP/u2up-net$ 
+
+If you want to remove all files not under version control and you are using git:
+--------------------------------------------------------------------------------
+$ git clean -d -f -x
+
+Simulation:
+===========
+...
+
