@@ -22,7 +22,7 @@ Building:
 Configure:
 ----------
 samo@hp450g3:~/Code/U2UP/u2up-net$ 
-samo@hp450g3:~/Code/U2UP/u2up-net$ env BUILDIR=./build PREFIX=/usr ./configure
+samo@hp450g3:~/Code/U2UP/u2up-net$ env BUILDIR=./build PREFIX=/usr/local ./configure
 ...
 samo@hp450g3:~/Code/U2UP/u2up-net$ 
 
