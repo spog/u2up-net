@@ -1,3 +1,49 @@
 "small-world" network simulation:
----------------------------------
+=================================
+Copyright 2020 Samo Pogacnik <samo_pogacnik@t-2.net>
 ...
+
+Identities, Addresses, Contacts, ...
+------------------------------------
+In general, identity represents a unique person / object / node and is
+being issued by one of a trusted authority.
+
+As a supplement to identity, addresses provide means of access to the
+person's / object's / node's identity. Generally, multiple addresses
+may be assigned to one's identity.
+
+Let's make an analogy from people's social network. For the sake of
+simplicity let's assume, that there are no modern communication means
+other than physical traveling and people's living addresses.
+Association of a preson's identity and its living addresses is called
+a contact.
+
+To maintain contacts people ask them selves two questions:
+1. Where (at which address) does a particular person live?
+   (Where does one live?)
+
+2. Which person lives at one particular address?
+   (Who lives there? - knock, knock...)
+
+To put those questions into a modern perspective of IP / DNS resolution.
+1. The first question corresponds to the forward name lookup.
+   (Which IP address is to be used to access a particular domain name?).
+
+2. The reverse name lookup may be seen as analogy of the second question.
+   (Which domain name would have been accessesd using a particular living
+   address?)
+
+Randomly generate network nodes
+-------------------------------
+In this simulation sequential issued Node ID numbers represent global
+identity of each node (analoguous to person's ID card in real life or
+like a traditional domain name / certificate of a host).
+
+On the other hand Node Address is randomly picked from the available
+one-dimensional address space (i.e. unsigned N-bit number).
+
+A separate (authority) thread handles generation of new nodes. It plays
+a role of a Node ID issuing authority. A new node gets sequetially
+assigned ID. Initially the authority thread also randomly picks a free
+Node Address.
+
