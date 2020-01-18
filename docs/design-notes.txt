@@ -1,6 +1,6 @@
 "small-world" network simulation:
 =================================
-Copyright 2020 Samo Pogacnik <samo_pogacnik@t-2.net>
+ Copyright (C) 2020 Samo Pogacnik <samo_pogacnik@t-2.net>
 ...
 
 Identities, Addresses, Contacts, ...
