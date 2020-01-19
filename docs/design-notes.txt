@@ -42,6 +42,10 @@ like a traditional domain name / certificate of a host).
 On the other hand Node Address is randomly picked from the available
 one-dimensional address space (i.e. unsigned N-bit number).
 
+User provides an argument about how many nodes would be created in one
+batch every second. Additional argument defines the maximun number of
+all nodes.
+
 A separate (authority) thread handles generation of new nodes. It plays
 a role of a Node ID issuing authority. A new node gets sequetially
 assigned ID. Initially the authority thread also randomly picks a free

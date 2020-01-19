@@ -32,7 +32,7 @@ include $(_SRCDIR_)/automk/objs.mk
 all: $(_OBJDIR_)/$(TARGET)
 
 $(_OBJDIR_)/$(TARGET): $(_OBJS_)
-	$(CC) $(_OBJS_) -o $@ $(LDFLAGS) -levm -lrt -Wl,-rpath=../lib
+	$(CC) $(_OBJS_) -o $@ $(LDFLAGS) -levm -lrt -lpthread -Wl,-rpath=../lib
 
 .PHONY: clean
 clean:
