@@ -137,7 +137,7 @@ static int evHelloMsg(evmConsumerStruct *consumer, evmMessageStruct *msg)
 }
 #endif
 
-static u2upNetAddrStruct * newU2upNetAddr(uint32_t addr, unsigned int node)
+static u2upNetAddrStruct * newU2upNetAddr(uint32_t addr)
 {
 	u2upNetAddrStruct *new = (u2upNetAddrStruct *)calloc(1, sizeof(u2upNetAddrStruct));
 
@@ -145,12 +145,11 @@ static u2upNetAddrStruct * newU2upNetAddr(uint32_t addr, unsigned int node)
 		abort();
 
 	new->addr = addr;
-	new->nodeId = node;
 
 	return new;
 }
 
-static u2upNetAddrStruct * insertNewNetAddr(u2upNetAddrRingStruct *ring, uint32_t addr, unsigned int node)
+static u2upNetAddrStruct * insertNewNetAddr(u2upNetAddrRingStruct *ring, uint32_t addr)
 {
 	u2upNetAddrStruct *tmp = NULL;
 	u2upNetAddrStruct *new = NULL;
@@ -161,7 +160,7 @@ static u2upNetAddrStruct * insertNewNetAddr(u2upNetAddrRingStruct *ring, uint32_
 	pthread_mutex_lock(&ring->amtx);
 
 	if (ring->first == NULL) {
-		new = newU2upNetAddr(addr, node);
+		new = newU2upNetAddr(addr);
 		new->next = new;
 		new->prev = new;
 		ring->first = new;
@@ -173,7 +172,7 @@ static u2upNetAddrStruct * insertNewNetAddr(u2upNetAddrRingStruct *ring, uint32_
 				return new;
 			}
 			if (tmp->next->addr > addr) {
-				new = newU2upNetAddr(addr, node);
+				new = newU2upNetAddr(addr);
 				new->next = tmp->next;
 				new->prev = tmp;
 				tmp->next->prev = new;
@@ -189,7 +188,7 @@ static u2upNetAddrStruct * insertNewNetAddr(u2upNetAddrRingStruct *ring, uint32_
 			pthread_mutex_unlock(&ring->amtx);
 			return new;
 		}
-		new = newU2upNetAddr(addr, node);
+		new = newU2upNetAddr(addr);
 		new->next = tmp->next;
 		new->prev = tmp;
 		tmp->next->prev = new;
@@ -202,7 +201,7 @@ static u2upNetAddrStruct * insertNewNetAddr(u2upNetAddrRingStruct *ring, uint32_
 	return new;
 }
 
-static u2upNetAddrStruct * generateNewNetAddr(u2upNetAddrRingStruct *ring, unsigned int node)
+static u2upNetAddrStruct * generateNewNetAddr(u2upNetAddrRingStruct *ring)
 {
 	int max_retry = 10;
 	uint32_t addr = (uint32_t)rand();
@@ -211,7 +210,7 @@ static u2upNetAddrStruct * generateNewNetAddr(u2upNetAddrRingStruct *ring, unsig
 	if (ring == NULL)
 		abort();
 
-	while ((max_retry > 0) && ((tmp = insertNewNetAddr(ring, addr, node)) == NULL)) {
+	while ((max_retry > 0) && ((tmp = insertNewNetAddr(ring, addr)) == NULL)) {
 		addr = (uint32_t)rand();
 		max_retry--;
 	}
@@ -245,12 +244,13 @@ static int handleTmrAuthBatch(evmConsumerStruct *consumer, evmTimerStruct *tmr)
 	if (next_node < max_nodes) {
 		for (i = 0; i < batch_nodes; i++) {
 			if (next_node < max_nodes) {
-				nodes[next_node].nodeAddr = generateNewNetAddr(&addr_ring, next_node);
+				nodes[next_node].nodeAddr = generateNewNetAddr(&addr_ring);
 				nodes[next_node].nodeId = next_node;
 				if ((nodes[next_node].consumer = evm_consumer_add(evm, next_node)) == NULL) {
 					evm_log_error("evm_consumer_add() failed!\n");
 					abort();
 				}
+				nodes[next_node].nodeAddr->node = &nodes[next_node];
 				next_node++;
 			} else {
 				break;
