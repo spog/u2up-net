@@ -44,6 +44,7 @@
 #include <getopt.h>
 #include <signal.h>
 #include <pthread.h>
+#include <time.h>
 
 #include <evm/libevm.h>
 #include "u2up-net-sim.h"
@@ -84,6 +85,7 @@ unsigned int batch_nodes = 1;
 unsigned int max_nodes = 10;
 static char *default_outfile = "./u2up-net-ring";
 static char *outfile = NULL;
+static struct tm start;
 
 /*
  * The EVM part.
@@ -223,7 +225,33 @@ static u2upNetAddrStruct * generateNewNetAddr(u2upNetAddrRingStruct *ring)
 static unsigned int secs = 0;
 int dump_u2up_net_ring(u2upNetAddrRingStruct *ring)
 {
-	evm_log_notice("Dump U2UP net ring to %s_%.8u.gv\n", outfile, secs);
+	u2upNetAddrStruct *tmp = NULL;
+	char *pathname;
+	FILE *file;
+
+	if (ring == NULL)
+		abort();
+
+	asprintf(&pathname, "%s_%.8u.gv", outfile, secs);
+	evm_log_notice("Dump U2UP net ring to %s\n", pathname);
+	if ((file = fopen(pathname, "w")) != NULL) {
+		fprintf(file, "/* circo -Tpng %s -o %s.png -Nshape=box */\n", pathname, pathname);
+		fprintf(file, "digraph \"u2upNet\" {\n");
+		pthread_mutex_lock(&ring->amtx);
+
+		tmp = ring->first;
+		while ((tmp != NULL) && (tmp->next != ring->first)) {
+			fprintf(file, "\"%u@%.8x\" -> \"%u@%.8x\" [color=gray,arrowsize=0,stype=dotted]\n", tmp->node->nodeId, tmp->addr, tmp->next->node->nodeId, tmp->next->addr);
+			tmp = tmp->next;
+		}
+		if (tmp != NULL)
+			fprintf(file, "\"%u@%.8x\" -> \"%u@%.8x\" [color=gray,arrowsize=0,stype=dotted]\n", tmp->node->nodeId, tmp->addr, tmp->next->node->nodeId, tmp->next->addr);
+
+		pthread_mutex_unlock(&ring->amtx);
+		fprintf(file, "}\n");
+		fflush(file);
+	}
+	free(pathname);
 	return 0;
 }
 
@@ -416,7 +444,7 @@ static void usage_help(char *argv[])
 	printf("\t-v, --verbose            Enable verbose output.\n");
 	printf("\t-b, --batch-nodes        Number of nodes to be created in a batch (default=%u).\n", batch_nodes);
 	printf("\t-m, --max-nodes          Maximum number of all nodes to be created (default=%u).\n", max_nodes);
-	printf("\t-o, --outfile           Output filename prefix (default=%s).\n", default_outfile);
+	printf("\t-o, --outfile            Output [path/]filename prefix (default=%s).\n", default_outfile);
 #if (EVMLOG_MODULE_TRACE != 0)
 	printf("\t-t, --trace              Enable trace output.\n");
 #endif
@@ -485,7 +513,7 @@ static int usage_check(int argc, char *argv[])
 
 		case 'o':
 			printf("outfile: optarg=%s\n", optarg);
-			asprintf(&outfile, "%s", optarg);
+			asprintf(&outfile, "%s_%.4d-%.2d-%.2d-%.2d%.2d", optarg, start.tm_year + 1900, start.tm_mon + 1, start.tm_mday, start.tm_hour, start.tm_min);
 			break;
 
 #if (EVMLOG_MODULE_TRACE != 0)
@@ -531,7 +559,7 @@ static int usage_check(int argc, char *argv[])
 	}
 
 	if (outfile == NULL)
-		outfile = default_outfile;
+		asprintf(&outfile, "%s_%.4d-%.2d-%.2d-%.2d%.2d", default_outfile, start.tm_year + 1900, start.tm_mon + 1, start.tm_mday, start.tm_hour, start.tm_min);
 
 #if 1 /*samo - test:*/
 	printf("batch_nodes = %u\n", batch_nodes);
@@ -543,6 +571,11 @@ static int usage_check(int argc, char *argv[])
 
 int main(int argc, char *argv[])
 {
+	time_t loctime;
+
+	time(&loctime);
+	localtime_r(&loctime, &start);
+
 	usage_check(argc, argv);
 
 	log_mask = LOG_MASK(LOG_EMERG) | LOG_MASK(LOG_ALERT) | LOG_MASK(LOG_CRIT) | LOG_MASK(LOG_ERR);
