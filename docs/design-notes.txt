@@ -23,7 +23,7 @@ To maintain contacts people ask them selves two questions:
    (Where does one live?)
 
 2. Which person lives at one particular address?
-   (Who lives there? - knock, knock...)
+   (Who lives there?)
 
 To put those questions into a modern perspective of IP / DNS resolution.
 1. The first question corresponds to the forward name lookup.
