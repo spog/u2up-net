@@ -139,6 +139,121 @@ static int evHelloMsg(evmConsumerStruct *consumer, evmMessageStruct *msg)
 }
 #endif
 
+static u2upNodeRingContactStruct * newU2upNodeContact(unsigned int id, uint32_t addr)
+{
+	u2upNodeRingContactStruct *new = (u2upNodeRingContactStruct *)calloc(1, sizeof(u2upNodeRingContactStruct));
+
+	if (new == NULL)
+		abort();
+
+	new->nodeId = id;
+	new->nodeAddr = addr;
+
+	return new;
+}
+
+static u2upNodeRingContactStruct * insertNodeContact(u2upNetNodeStruct *node, unsigned int id, uint32_t addr)
+{
+	u2upNodeRingContactStruct *tmp = NULL;
+	u2upNodeRingContactStruct *new = NULL;
+
+	if (node == NULL)
+		abort();
+
+	pthread_mutex_lock(&node->amtx);
+
+	if (node->first_contact == NULL) {
+		new = newU2upNodeContact(id, addr);
+		new->next = new;
+		new->prev = new;
+		node->first_contact = new;
+	} else {
+		tmp = node->first_contact;
+		while (tmp->next != node->first_contact) {
+			if (tmp->nodeAddr == addr) { /*already inserted*/
+				if (tmp->nodeId == id) /*with same ID -> OK, otherwise NULL*/
+					new = tmp;
+				pthread_mutex_unlock(&node->amtx);
+				return new;
+			}
+			if (tmp->next->nodeAddr > addr) {
+				new = newU2upNodeContact(id, addr);
+				new->next = tmp->next;
+				new->prev = tmp;
+				tmp->next->prev = new;
+				tmp->next = new;
+				if ((node->nodeAddr->addr - addr) < (node->nodeAddr->addr - node->first_contact->nodeAddr))
+					node->first_contact = new;
+				pthread_mutex_unlock(&node->amtx);
+				return new;
+			}
+			tmp = tmp->next;
+		}
+		if (tmp->nodeAddr == addr) { /*already inserted*/
+			if (tmp->nodeId == id) /*with same ID -> OK, otherwise NULL*/
+				new = tmp;
+			pthread_mutex_unlock(&node->amtx);
+			return new;
+		}
+		new = newU2upNodeContact(id, addr);
+		new->next = tmp->next;
+		new->prev = tmp;
+		tmp->next->prev = new;
+		tmp->next = new;
+		if ((node->nodeAddr->addr - addr) < (node->nodeAddr->addr - node->first_contact->nodeAddr))
+			node->first_contact = new;
+	}
+
+	pthread_mutex_unlock(&node->amtx);
+	return new;
+}
+
+static u2upNodeRingContactStruct * deleteNodeContact(u2upNetNodeStruct *node, unsigned int id, uint32_t addr)
+{
+	u2upNodeRingContactStruct *tmp = NULL;
+	u2upNodeRingContactStruct *new = NULL;
+
+	if (node == NULL)
+		abort();
+
+	pthread_mutex_lock(&node->amtx);
+
+	if (node->first_contact == NULL) {
+		pthread_mutex_unlock(&node->amtx);
+		return new;
+	} else {
+		tmp = node->first_contact;
+		while (tmp->next != node->first_contact) {
+			if (tmp->nodeAddr == addr) { /*address found*/
+				if (tmp->nodeId == id) { /*ID found -> DELETE -> NULL, otherwise tmp*/
+					tmp->prev->next = tmp->next;
+					tmp->next->prev = tmp->prev;
+					if (node->first_contact == tmp)
+						node->first_contact = tmp->next;
+					free(tmp);
+					tmp = NULL;
+				}
+				pthread_mutex_unlock(&node->amtx);
+				return tmp;
+			}
+			tmp = tmp->next;
+		}
+		if (tmp->nodeAddr == addr) { /*already inserted*/
+			if (tmp->nodeId == id) { /*ID found -> DELETE -> NULL, otherwise tmp*/
+				tmp->prev->next = tmp->next;
+				tmp->next->prev = tmp->prev;
+				if (node->first_contact == tmp)
+					node->first_contact = tmp->next;
+				free(tmp);
+				tmp = NULL;
+			}
+		}
+	}
+
+	pthread_mutex_unlock(&node->amtx);
+	return tmp;
+}
+
 static u2upNetRingAddrStruct * newU2upNetAddr(uint32_t addr)
 {
 	u2upNetRingAddrStruct *new = (u2upNetRingAddrStruct *)calloc(1, sizeof(u2upNetRingAddrStruct));
@@ -272,8 +387,11 @@ static int handleTmrAuthBatch(evmConsumerStruct *consumer, evmTimerStruct *tmr)
 	if (next_node < max_nodes) {
 		for (i = 0; i < batch_nodes; i++) {
 			if (next_node < max_nodes) {
+				nodes[next_node].first_contact = NULL;
 				nodes[next_node].nodeAddr = generateNewNetAddr(&net_addr_ring);
 				nodes[next_node].nodeId = next_node;
+				pthread_mutex_init(&nodes[next_node].amtx, NULL);
+				pthread_mutex_unlock(&nodes[next_node].amtx);
 				if ((nodes[next_node].consumer = evm_consumer_add(evm, next_node)) == NULL) {
 					evm_log_error("evm_consumer_add() failed!\n");
 					abort();
