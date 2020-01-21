@@ -97,7 +97,7 @@ static struct tm start;
 static evmStruct *evm;
 static evmConsumerStruct *auth_consumer;
 static u2upNetNodeStruct *nodes;
-static u2upNetAddrRingStruct addr_ring;
+static u2upNetRingHeadStruct net_addr_ring;
 static int next_node = 0;
 
 #if 0
@@ -139,9 +139,9 @@ static int evHelloMsg(evmConsumerStruct *consumer, evmMessageStruct *msg)
 }
 #endif
 
-static u2upNetAddrStruct * newU2upNetAddr(uint32_t addr)
+static u2upNetRingAddrStruct * newU2upNetAddr(uint32_t addr)
 {
-	u2upNetAddrStruct *new = (u2upNetAddrStruct *)calloc(1, sizeof(u2upNetAddrStruct));
+	u2upNetRingAddrStruct *new = (u2upNetRingAddrStruct *)calloc(1, sizeof(u2upNetRingAddrStruct));
 
 	if (new == NULL)
 		abort();
@@ -151,10 +151,10 @@ static u2upNetAddrStruct * newU2upNetAddr(uint32_t addr)
 	return new;
 }
 
-static u2upNetAddrStruct * insertNewNetAddr(u2upNetAddrRingStruct *ring, uint32_t addr)
+static u2upNetRingAddrStruct * insertNewNetAddr(u2upNetRingHeadStruct *ring, uint32_t addr)
 {
-	u2upNetAddrStruct *tmp = NULL;
-	u2upNetAddrStruct *new = NULL;
+	u2upNetRingAddrStruct *tmp = NULL;
+	u2upNetRingAddrStruct *new = NULL;
 
 	if (ring == NULL)
 		abort();
@@ -203,11 +203,11 @@ static u2upNetAddrStruct * insertNewNetAddr(u2upNetAddrRingStruct *ring, uint32_
 	return new;
 }
 
-static u2upNetAddrStruct * generateNewNetAddr(u2upNetAddrRingStruct *ring)
+static u2upNetRingAddrStruct * generateNewNetAddr(u2upNetRingHeadStruct *ring)
 {
 	int max_retry = 10;
 	uint32_t addr = (uint32_t)rand();
-	u2upNetAddrStruct *tmp = NULL;
+	u2upNetRingAddrStruct *tmp = NULL;
 
 	if (ring == NULL)
 		abort();
@@ -223,9 +223,9 @@ static u2upNetAddrStruct * generateNewNetAddr(u2upNetAddrRingStruct *ring)
 }
 
 static unsigned int secs = 0;
-int dump_u2up_net_ring(u2upNetAddrRingStruct *ring)
+int dump_u2up_net_ring(u2upNetRingHeadStruct *ring)
 {
-	u2upNetAddrStruct *tmp = NULL;
+	u2upNetRingAddrStruct *tmp = NULL;
 	char *pathname;
 	FILE *file;
 
@@ -264,7 +264,7 @@ static int handleTmrAuthBatch(evmConsumerStruct *consumer, evmTimerStruct *tmr)
 	secs++;
 	if (pthread_mutex_trylock(&simulation_global_mutex) == EBUSY) {
 		evm_log_notice("SIGUSR1 RECEIVED!\n");
-		dump_u2up_net_ring(&addr_ring);
+		dump_u2up_net_ring(&net_addr_ring);
 	}
 	pthread_mutex_unlock(&simulation_global_mutex);
 
@@ -272,7 +272,7 @@ static int handleTmrAuthBatch(evmConsumerStruct *consumer, evmTimerStruct *tmr)
 	if (next_node < max_nodes) {
 		for (i = 0; i < batch_nodes; i++) {
 			if (next_node < max_nodes) {
-				nodes[next_node].nodeAddr = generateNewNetAddr(&addr_ring);
+				nodes[next_node].nodeAddr = generateNewNetAddr(&net_addr_ring);
 				nodes[next_node].nodeId = next_node;
 				if ((nodes[next_node].consumer = evm_consumer_add(evm, next_node)) == NULL) {
 					evm_log_error("evm_consumer_add() failed!\n");
@@ -596,10 +596,10 @@ int main(int argc, char *argv[])
 	if ((nodes = (u2upNetNodeStruct *)calloc(max_nodes, sizeof(u2upNetNodeStruct))) == NULL)
 		abort();
 
-	/* Initialize addr_ring structure */
-	addr_ring.first = NULL;
-	pthread_mutex_init(&addr_ring.amtx, NULL);
-	pthread_mutex_unlock(&addr_ring.amtx);
+	/* Initialize net_addr_ring structure */
+	net_addr_ring.first = NULL;
+	pthread_mutex_init(&net_addr_ring.amtx, NULL);
+	pthread_mutex_unlock(&net_addr_ring.amtx);
 
 	pthread_mutex_init(&simulation_global_mutex, NULL);
 	pthread_mutex_unlock(&simulation_global_mutex);

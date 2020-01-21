@@ -41,24 +41,24 @@ struct u2up_node_addr_list {
 	u2upNetAddrListStruct *next;
 }; /*u2upNetAddrListStruct*/
 
-typedef struct u2up_net_addr u2upNetAddrStruct;
+typedef struct u2up_net_ring_addr u2upNetRingAddrStruct;
 
 typedef struct u2up_net_node {
 	unsigned int nodeId;
-	u2upNetAddrStruct *nodeAddr;
+	u2upNetRingAddrStruct *nodeAddr;
 	evmConsumerStruct *consumer;
 } u2upNetNodeStruct;
 
-struct u2up_net_addr {
+struct u2up_net_ring_addr {
 	uint32_t addr;
 	u2upNetNodeStruct *node;
-	u2upNetAddrStruct *next;
-	u2upNetAddrStruct *prev;
-}; /*u2upNetAddrStruct*/
+	u2upNetRingAddrStruct *next;
+	u2upNetRingAddrStruct *prev;
+}; /*u2upNetRingAddrStruct*/
 
-typedef struct u2up_net_addr_ring {
+typedef struct u2up_net_ring_head {
 	pthread_mutex_t amtx;
-	u2upNetAddrStruct *first;
-} u2upNetAddrRingStruct;
+	u2upNetRingAddrStruct *first;
+} u2upNetRingHeadStruct;
 
 #endif /*U2UP_NET_FILE_u2up_net_sim_h*/
