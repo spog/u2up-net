@@ -55,7 +55,7 @@ typedef struct u2up_net_ring_addr u2upNetRingAddrStruct;
 typedef struct u2up_net_node {
 	pthread_mutex_t amtx;
 	unsigned int nodeId;
-	u2upNetRingAddrStruct *nodeAddr;
+	u2upNetRingAddrStruct *ringAddr;
 	u2upNodeRingContactStruct *first_contact;
 	evmConsumerStruct *consumer;
 } u2upNetNodeStruct;
