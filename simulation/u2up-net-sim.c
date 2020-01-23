@@ -394,14 +394,14 @@ int dump_u2up_net_ring(u2upNetRingHeadStruct *ring)
 		ring_addr = ring->first;
 		while ((ring_addr != NULL) && (ring_addr->next != ring->first)) {
 			fprintf(file, "\"%.8x\" [label=\"%.8x\\n(%u)\"];\n", ring_addr->addr, ring_addr->addr, ring_addr->node->nodeId);
-			fprintf(file, "\"%.8x\" -> \"%.8x\" [color=gray,arrowsize=0,style=dotted];\n", ring_addr->addr, ring_addr->next->addr);
-			fprintf(file, "\"%.8x\" -> \"%.8x\" [color=gray,arrowsize=0,style=dotted];\n", ring_addr->addr, ring_addr->prev->addr);
+			fprintf(file, "\"%.8x\" -> \"%.8x\" [color=black,arrowsize=0,style=dotted];\n", ring_addr->addr, ring_addr->next->addr);
+			fprintf(file, "\"%.8x\" -> \"%.8x\" [color=black,arrowsize=0,style=dotted];\n", ring_addr->addr, ring_addr->prev->addr);
 			ring_addr = ring_addr->next;
 		}
 		if (ring_addr != NULL) {
 			fprintf(file, "\"%.8x\" [label=\"%.8x\\n(%u)\"];\n", ring_addr->addr, ring_addr->addr, ring_addr->node->nodeId);
-			fprintf(file, "\"%.8x\" -> \"%.8x\" [color=gray,arrowsize=0,style=dotted];\n", ring_addr->addr, ring_addr->next->addr);
-			fprintf(file, "\"%.8x\" -> \"%.8x\" [color=gray,arrowsize=0,style=dotted];\n", ring_addr->addr, ring_addr->prev->addr);
+			fprintf(file, "\"%.8x\" -> \"%.8x\" [color=black,arrowsize=0,style=dotted];\n", ring_addr->addr, ring_addr->next->addr);
+			fprintf(file, "\"%.8x\" -> \"%.8x\" [color=black,arrowsize=0,style=dotted];\n", ring_addr->addr, ring_addr->prev->addr);
 		}
 
 		/* Draw all node contacts */
