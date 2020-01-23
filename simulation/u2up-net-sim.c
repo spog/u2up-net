@@ -384,6 +384,7 @@ int dump_u2up_net_ring(u2upNetRingHeadStruct *ring)
 		abort();
 
 	asprintf(&pathname, "%s_%.8u.gv", outfile, secs);
+	evm_log_notice("(Write file: %s)\n", pathname);
 	if ((file = fopen(pathname, "w")) != NULL) {
 		fprintf(file, "/* circo -Tsvg %s -o %s.svg -Nshape=box */\n", pathname, pathname);
 		fprintf(file, "digraph \"u2upNet\" {\n");
@@ -442,13 +443,14 @@ static int handleTmrAuthBatch(evmConsumerStruct *consumer, evmTimerStruct *tmr)
 
 	secs++;
 	if (pthread_mutex_trylock(&simulation_global_mutex) == EBUSY) {
-		evm_log_notice("SIGUSR1 RECEIVED!\n");
+		evm_log_info("SIGUSR1 RECEIVED!\n");
 		dump_u2up_net_ring(&net_addr_ring);
 	}
 	pthread_mutex_unlock(&simulation_global_mutex);
 
 	evm_log_debug("AUTH_BATCH timer expired!\n");
 	if (next_node < max_nodes) {
+		evm_log_notice("(%d nodes)\n", next_node);
 		for (i = 0; i < batch_nodes; i++) {
 			if (next_node < max_nodes) {
 				nodes[next_node].first_contact = NULL;
@@ -464,6 +466,7 @@ static int handleTmrAuthBatch(evmConsumerStruct *consumer, evmTimerStruct *tmr)
 				}
 				next_node++;
 			} else {
+				evm_log_notice("(all %d nodes created)\n", next_node);
 				break;
 			}
 		}
@@ -590,7 +593,7 @@ static int simulation_authority_run(void)
 		abort();
 	}
 	tmrAuthBatch = hello_start_timer(NULL, 1, 0, NULL, tmrid_ptr);
-	evm_log_notice("AUTH_BATCH timer set: 0 s\n");
+	evm_log_notice("AUTH_BATCH timer set: 1 s\n");
 
 #if 0
 	/* Set initial QUIT timer */
