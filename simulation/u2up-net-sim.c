@@ -385,7 +385,7 @@ int dump_u2up_net_ring(u2upNetRingHeadStruct *ring)
 
 	asprintf(&pathname, "%s_%.8u.gv", outfile, secs);
 	if ((file = fopen(pathname, "w")) != NULL) {
-		fprintf(file, "/* circo -Tpng %s -o %s.png -Nshape=box */\n", pathname, pathname);
+		fprintf(file, "/* circo -Tsvg %s -o %s.svg -Nshape=box */\n", pathname, pathname);
 		fprintf(file, "digraph \"u2upNet\" {\n");
 		pthread_mutex_lock(&ring->amtx);
 
