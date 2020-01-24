@@ -318,33 +318,30 @@ static u2upNetRingAddrStruct * insertNewNetAddr(u2upNetRingHeadStruct *ring, uin
 		ring->first = new;
 	} else {
 		tmp = ring->first;
-		while (tmp->next != ring->first) {
+		do {
 			if (tmp->addr == addr) {
 				pthread_mutex_unlock(&ring->amtx);
-				return new;
+				return NULL;
 			}
-			if (tmp->next->addr > addr) {
+			if (tmp->addr > addr) {
 				new = newU2upNetAddr(addr);
-				new->next = tmp->next;
-				new->prev = tmp;
-				tmp->next->prev = new;
-				tmp->next = new;
+				new->next = tmp;
+				new->prev = tmp->prev;
+				tmp->prev->next = new;
+				tmp->prev = new;
 				if (addr < ring->first->addr)
 					ring->first = new;
 				pthread_mutex_unlock(&ring->amtx);
 				return new;
 			}
 			tmp = tmp->next;
-		}
-		if (tmp->addr == addr) {
-			pthread_mutex_unlock(&ring->amtx);
-			return new;
-		}
+		} while (tmp != ring->first);
+
 		new = newU2upNetAddr(addr);
-		new->next = tmp->next;
-		new->prev = tmp;
-		tmp->next->prev = new;
-		tmp->next = new;
+		new->next = tmp;
+		new->prev = tmp->prev;
+		tmp->prev->next = new;
+		tmp->prev = new;
 		if (addr < ring->first->addr)
 			ring->first = new;
 	}
