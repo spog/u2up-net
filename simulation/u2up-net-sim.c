@@ -204,37 +204,34 @@ static u2upNodeRingContactStruct * insertNodeContact(u2upNetNodeStruct *node, un
 		node->first_contact = new;
 	} else {
 		tmp = node->first_contact;
-		while (tmp->next != node->first_contact) {
+		do {
 			if (tmp->nodeAddr == addr) { /*already inserted*/
 				if (tmp->nodeId == id) /*with same ID -> OK, otherwise NULL*/
 					new = tmp;
 				pthread_mutex_unlock(&node->amtx);
 				return new;
 			}
-			if (tmp->next->nodeAddr > addr) {
+			if (tmp->nodeAddr > addr) {
 				new = newU2upNodeContact(id, addr);
-				new->next = tmp->next;
-				new->prev = tmp;
-				tmp->next->prev = new;
-				tmp->next = new;
+				new->next = tmp;
+				new->prev = tmp->prev;
+				tmp->prev->next = new;
+				tmp->prev = new;
+				/*TODO - maybe ->prev is closer*/
 				if ((node->ringAddr->addr - addr) < (node->ringAddr->addr - node->first_contact->nodeAddr))
 					node->first_contact = new;
 				pthread_mutex_unlock(&node->amtx);
 				return new;
 			}
 			tmp = tmp->next;
-		}
-		if (tmp->nodeAddr == addr) { /*already inserted*/
-			if (tmp->nodeId == id) /*with same ID -> OK, otherwise NULL*/
-				new = tmp;
-			pthread_mutex_unlock(&node->amtx);
-			return new;
-		}
+		} while (tmp != node->first_contact);
+
 		new = newU2upNodeContact(id, addr);
-		new->next = tmp->next;
-		new->prev = tmp;
-		tmp->next->prev = new;
-		tmp->next = new;
+		new->next = tmp;
+		new->prev = tmp->prev;
+		tmp->prev->next = new;
+		tmp->prev = new;
+		/*TODO - maybe ->prev is closer*/
 		if ((node->ringAddr->addr - addr) < (node->ringAddr->addr - node->first_contact->nodeAddr))
 			node->first_contact = new;
 	}
@@ -243,10 +240,9 @@ static u2upNodeRingContactStruct * insertNodeContact(u2upNetNodeStruct *node, un
 	return new;
 }
 
-static u2upNodeRingContactStruct * deleteNodeContact(u2upNetNodeStruct *node, unsigned int id, uint32_t addr)
+static u2upNodeRingContactStruct * deleteNodeContact(u2upNetNodeStruct *node, uint32_t addr)
 {
 	u2upNodeRingContactStruct *tmp = NULL;
-	u2upNodeRingContactStruct *new = NULL;
 
 	if (node == NULL)
 		abort();
@@ -255,38 +251,25 @@ static u2upNodeRingContactStruct * deleteNodeContact(u2upNetNodeStruct *node, un
 
 	if (node->first_contact == NULL) {
 		pthread_mutex_unlock(&node->amtx);
-		return new;
+		return NULL;
 	} else {
 		tmp = node->first_contact;
-		while (tmp->next != node->first_contact) {
-			if (tmp->nodeAddr == addr) { /*address found*/
-				if (tmp->nodeId == id) { /*ID found -> DELETE -> NULL, otherwise tmp*/
-					tmp->prev->next = tmp->next;
-					tmp->next->prev = tmp->prev;
-					if (node->first_contact == tmp)
-						node->first_contact = tmp->next;
-					free(tmp);
-					tmp = NULL;
-				}
+		do {
+			if (tmp->nodeAddr == addr) { /*address found -> DELETE -> return tmp*/
+				tmp->prev->next = tmp->next;
+				tmp->next->prev = tmp->prev;
+				if (node->first_contact == tmp) /*TODO - maybe ->prev is closer*/
+					node->first_contact = tmp->next;
+				free(tmp);
 				pthread_mutex_unlock(&node->amtx);
 				return tmp;
 			}
 			tmp = tmp->next;
-		}
-		if (tmp->nodeAddr == addr) { /*already inserted*/
-			if (tmp->nodeId == id) { /*ID found -> DELETE -> NULL, otherwise tmp*/
-				tmp->prev->next = tmp->next;
-				tmp->next->prev = tmp->prev;
-				if (node->first_contact == tmp)
-					node->first_contact = tmp->next;
-				free(tmp);
-				tmp = NULL;
-			}
-		}
+		} while (tmp != node->first_contact);
 	}
 
 	pthread_mutex_unlock(&node->amtx);
-	return tmp;
+	return NULL;
 }
 
 static u2upNetRingAddrStruct * newU2upNetAddr(uint32_t addr)
@@ -329,6 +312,7 @@ static u2upNetRingAddrStruct * insertNewNetAddr(u2upNetRingHeadStruct *ring, uin
 				new->prev = tmp->prev;
 				tmp->prev->next = new;
 				tmp->prev = new;
+				/*TODO - maybe ->prev is closer*/
 				if (addr < ring->first->addr)
 					ring->first = new;
 				pthread_mutex_unlock(&ring->amtx);
@@ -342,6 +326,7 @@ static u2upNetRingAddrStruct * insertNewNetAddr(u2upNetRingHeadStruct *ring, uin
 		new->prev = tmp->prev;
 		tmp->prev->next = new;
 		tmp->prev = new;
+		/*TODO - maybe ->prev is closer*/
 		if (addr < ring->first->addr)
 			ring->first = new;
 	}
