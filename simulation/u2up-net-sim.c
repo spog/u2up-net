@@ -143,8 +143,8 @@ static int send_protocol_init_msg(evmConsumerStruct *consumer, u2upNetNodeStruct
 		return -1;
 	}
 	/*set random contact into the message*/
-	contact->nodeId = id;
-	contact->nodeAddr = addr;
+	contact->id = id;
+	contact->addr = addr;
 
 	evm_message_ctx_set(msg, (void *)node);
 	/* Send Initial random contact to the node. */
@@ -165,12 +165,12 @@ static int evProtocolInitMsg(evmConsumerStruct *consumer, evmMessageStruct *msg)
 
 	if ((contact = (u2upNodeRingContactStruct *)evm_message_data_get(msg)) == NULL)
 		return -1;
-	evm_log_info("INIT msg received: contact: %u@%.8u\n", contact->nodeId, contact->nodeAddr);
+	evm_log_info("INIT msg received: contact: %u@%.8u\n", contact->id, contact->addr);
 
 	if ((node = evm_message_ctx_get(msg)) == NULL)
 		return -1;
 
-	insertNodeContact(node, contact->nodeId, contact->nodeAddr);
+	insertNodeContact(node, contact->id, contact->addr);
 	return 0;
 }
 
@@ -181,8 +181,8 @@ static u2upNodeRingContactStruct * newU2upNodeContact(unsigned int id, uint32_t 
 	if (new == NULL)
 		abort();
 
-	new->nodeId = id;
-	new->nodeAddr = addr;
+	new->id = id;
+	new->addr = addr;
 
 	return new;
 }
@@ -205,20 +205,20 @@ static u2upNodeRingContactStruct * insertNodeContact(u2upNetNodeStruct *node, un
 	} else {
 		tmp = node->first_contact;
 		do {
-			if (tmp->nodeAddr == addr) { /*already inserted*/
-				if (tmp->nodeId == id) /*with same ID -> OK, otherwise NULL*/
+			if (tmp->addr == addr) { /*already inserted*/
+				if (tmp->id == id) /*with same ID -> OK, otherwise NULL*/
 					new = tmp;
 				pthread_mutex_unlock(&node->amtx);
 				return new;
 			}
-			if (tmp->nodeAddr > addr) {
+			if (tmp->addr > addr) {
 				new = newU2upNodeContact(id, addr);
 				new->next = tmp;
 				new->prev = tmp->prev;
 				tmp->prev->next = new;
 				tmp->prev = new;
 				/*TODO - maybe ->prev is closer*/
-				if ((node->ringAddr->addr - addr) < (node->ringAddr->addr - node->first_contact->nodeAddr))
+				if ((node->ringAddr->addr - addr) < (node->ringAddr->addr - node->first_contact->addr))
 					node->first_contact = new;
 				pthread_mutex_unlock(&node->amtx);
 				return new;
@@ -232,7 +232,7 @@ static u2upNodeRingContactStruct * insertNodeContact(u2upNetNodeStruct *node, un
 		tmp->prev->next = new;
 		tmp->prev = new;
 		/*TODO - maybe ->prev is closer*/
-		if ((node->ringAddr->addr - addr) < (node->ringAddr->addr - node->first_contact->nodeAddr))
+		if ((node->ringAddr->addr - addr) < (node->ringAddr->addr - node->first_contact->addr))
 			node->first_contact = new;
 	}
 
@@ -255,7 +255,7 @@ static u2upNodeRingContactStruct * deleteNodeContact(u2upNetNodeStruct *node, ui
 	} else {
 		tmp = node->first_contact;
 		do {
-			if (tmp->nodeAddr == addr) { /*address found -> DELETE -> return tmp*/
+			if (tmp->addr == addr) { /*address found -> DELETE -> return tmp*/
 				tmp->prev->next = tmp->next;
 				tmp->next->prev = tmp->prev;
 				if (node->first_contact == tmp) /*TODO - maybe ->prev is closer*/
@@ -376,7 +376,7 @@ int dump_u2up_net_ring(u2upNetRingHeadStruct *ring)
 		ring_addr = ring->first;
 		if (ring_addr != NULL) {
 			do {
-				fprintf(file, "\"%.8x\" [label=\"%.8x\\n(%u)\"];\n", ring_addr->addr, ring_addr->addr, ring_addr->node->nodeId);
+				fprintf(file, "\"%.8x\" [label=\"%.8x\\n(%u)\"];\n", ring_addr->addr, ring_addr->addr, ring_addr->node->id);
 				fprintf(file, "\"%.8x\" -> \"%.8x\" [color=black,arrowsize=0,style=dotted];\n", ring_addr->addr, ring_addr->next->addr);
 				fprintf(file, "\"%.8x\" -> \"%.8x\" [color=black,arrowsize=0,style=dotted];\n", ring_addr->addr, ring_addr->prev->addr);
 				ring_addr = ring_addr->next;
@@ -390,7 +390,7 @@ int dump_u2up_net_ring(u2upNetRingHeadStruct *ring)
 				ctact = ring_addr->node->first_contact;
 				if (ctact != NULL) {
 					do {
-						fprintf(file, "\"%.8x\" -> \"%.8x\" [color=black,arrowsize=0.7];\n", ring_addr->addr, ctact->nodeAddr);
+						fprintf(file, "\"%.8x\" -> \"%.8x\" [color=black,arrowsize=0.7];\n", ring_addr->addr, ctact->addr);
 						ctact = ctact->next;
 					} while (ctact != ring_addr->node->first_contact);
 				}
@@ -427,14 +427,14 @@ static int handleTmrAuthBatch(evmConsumerStruct *consumer, evmTimerStruct *tmr)
 			if (next_node < max_nodes) {
 				nodes[next_node].first_contact = NULL;
 				nodes[next_node].ringAddr = generateNewNetAddr(&net_addr_ring);
-				nodes[next_node].nodeId = next_node;
+				nodes[next_node].id = next_node;
 				pthread_mutex_init(&nodes[next_node].amtx, NULL);
 				pthread_mutex_unlock(&nodes[next_node].amtx);
 				nodes[next_node].consumer = protocol_consumer;
 				nodes[next_node].ringAddr->node = &nodes[next_node];
 				if (next_node > 0) {
 					rand_id = rand() % next_node;
-					send_protocol_init_msg(protocol_consumer, &nodes[next_node], nodes[rand_id].nodeId, nodes[rand_id].ringAddr->addr);
+					send_protocol_init_msg(protocol_consumer, &nodes[next_node], nodes[rand_id].id, nodes[rand_id].ringAddr->addr);
 				}
 				next_node++;
 			} else {

@@ -33,8 +33,6 @@
 #	define EXTERN extern
 #endif
 
-#define MAX_BUFF_SIZE 1024
-
 typedef struct u2up_node_addr_list u2upNetAddrListStruct;
 struct u2up_node_addr_list {
 	uint32_t addr;
@@ -44,8 +42,8 @@ struct u2up_node_addr_list {
 typedef struct u2up_node_ring_contact u2upNodeRingContactStruct;
 
 struct u2up_node_ring_contact {
-	uint32_t nodeAddr;
-	unsigned int nodeId;
+	uint32_t addr;
+	unsigned int id;
 	u2upNodeRingContactStruct *next;
 	u2upNodeRingContactStruct *prev;
 }; /*u2upNodeRingContactStruct*/
@@ -54,7 +52,7 @@ typedef struct u2up_net_ring_addr u2upNetRingAddrStruct;
 
 typedef struct u2up_net_node {
 	pthread_mutex_t amtx;
-	unsigned int nodeId;
+	unsigned int id;
 	u2upNetRingAddrStruct *ringAddr;
 	u2upNodeRingContactStruct *first_contact;
 	evmConsumerStruct *consumer;
