@@ -23,7 +23,7 @@ TARGET := u2up-net-sim
 _INSTDIR_ := $(_INSTALL_PREFIX_)/bin
 
 # Files to be compiled:
-SRCS := $(TARGET).c
+SRCS := u2up-net-common.c $(TARGET).c
 
 # include automatic _OBJS_ compilation and SRCSx dependencies generation
 include $(_SRCDIR_)/automk/objs.mk

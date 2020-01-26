@@ -48,13 +48,14 @@
 
 #include <evm/libevm.h>
 #include "u2up-net-sim.h"
+#include "u2up-net-common.h"
 
 #include <userlog/log_module.h>
 EVMLOG_MODULE_INIT(U2UP_SIM, 2);
 
 enum evm_consumer_ids {
 	EVM_CONSUMER_AUTH = 0,
-	EVM_CONSUMER_PROTOCOL = 1
+	EVM_CONSUMER_PROTOCOL
 };
 
 enum evm_msgtype_ids {
@@ -63,23 +64,24 @@ enum evm_msgtype_ids {
 };
 
 enum evm_msg_ids {
-	EV_ID_PROTOCOL_MSG_INIT = 0
+	EV_ID_PROTOCOL_MSG_INIT = 0,
+	EV_ID_PROTOCOL_MSG_NEAR_REQ,
+	EV_ID_PROTOCOL_MSG_NEAR_REPL
 };
 
 enum evm_tmr_ids {
 	TMR_ID_AUTH_BATCH = 0,
+	TMR_ID_NEAR_REQ,
 	EV_ID_HELLO_TMR_QUIT
 };
 
-static evmTimerStruct * hello_start_timer(evmTimerStruct *tmr, time_t tv_sec, long tv_nsec, void *ctx_ptr, evmTmridStruct *tmrid_ptr);
+static evmTimerStruct * auth_start_timer(evmTimerStruct *tmr, time_t tv_sec, long tv_nsec, void *ctx_ptr, evmTmridStruct *tmrid_ptr);
 
 static int evProtocolInitMsg(evmConsumerStruct *consumer, evmMessageStruct *msg);
 #if 0
 static int evHelloTmrIdle(evmConsumerStruct *consumer, evmTimerStruct *tmr);
 static int evHelloTmrQuit(evmConsumerStruct *consumer, evmTimerStruct *tmr);
 #endif
-
-static u2upNodeRingContactStruct * insertNodeContact(u2upNetNodeStruct *node, unsigned int id, uint32_t addr);
 
 static pthread_mutex_t simulation_global_mutex;
 static int simulation_evm_init(void);
@@ -105,7 +107,9 @@ static u2upNetRingHeadStruct net_addr_ring;
 static int next_node = 0;
 
 static evmMsgtypeStruct *msgtype_ptr;
-static evmMsgidStruct *msgid_ptr;
+static evmMsgidStruct *msgid_init_ptr;
+static evmMsgidStruct *msgid_near_req_ptr;
+static evmMsgidStruct *msgid_near_repl_ptr;
 #if 0
 /* HELLO messages */
 static char *hello_str = "HELLO";
@@ -116,24 +120,69 @@ evmMessageStruct *helloMsg;
 /* HELLO timers */
 #endif
 /* Timers */
+static evmTmridStruct *tmridNearReq;
 static evmTimerStruct *tmrAuthBatch;
+//orig:static evmTimerStruct *tmrNearReq = NULL;
 //orig:static evmTimerStruct *helloQuitTmr;
 
-static evmTimerStruct * hello_start_timer(evmTimerStruct *tmr, time_t tv_sec, long tv_nsec, void *ctx_ptr, evmTmridStruct *tmrid_ptr)
+static evmTimerStruct * auth_start_timer(evmTimerStruct *tmr, time_t tv_sec, long tv_nsec, void *ctx_ptr, evmTmridStruct *tmrid_ptr)
 {
 	evm_log_info("(entry) tmr=%p, sec=%ld, nsec=%ld, ctx_ptr=%p\n", tmr, tv_sec, tv_nsec, ctx_ptr);
 	evm_timer_stop(tmr);
 	return evm_timer_start(auth_consumer, tmrid_ptr, tv_sec, tv_nsec, ctx_ptr);
 }
 
+static evmTimerStruct * protocol_start_timer(evmTimerStruct *tmr, time_t tv_sec, long tv_nsec, void *ctx_ptr, evmTmridStruct *tmrid_ptr)
+{
+	evm_log_info("(entry) tmr=%p, sec=%ld, nsec=%ld, ctx_ptr=%p\n", tmr, tv_sec, tv_nsec, ctx_ptr);
+//orig:	evm_timer_stop(tmr);
+	return evm_timer_start(protocol_consumer, tmrid_ptr, tv_sec, tv_nsec, ctx_ptr);
+}
+
 /* Send PROTOCOL messages */
-static int send_protocol_init_msg(evmConsumerStruct *consumer, u2upNetNodeStruct *node, unsigned int id, uint32_t addr)
+static int send_protocol_msg(evmConsumerStruct *consumer, evmMsgidStruct *msgid_ptr, u2upNetNodeStruct *node, unsigned int id, uint32_t addr)
 {
 	evmMessageStruct *msg;
 	u2upNodeRingContactStruct *contact = NULL;
-	evm_log_info("(entry) consumer=%p, node=%p, addr=%u\n", consumer, node, addr);
+	evm_log_info("(entry) consumer=%p, msgid_ptr=%p, node=%p, addr=%u\n", consumer, msgid_ptr, node, addr);
+
+	if ((consumer == NULL) || (msgid_ptr == NULL) || (node == NULL))
+		return -1;
 
 	if ((msg = evm_message_new(msgtype_ptr, msgid_ptr, sizeof(u2upNodeRingContactStruct))) == NULL) {
+		evm_log_error("evm_message_new() failed!\n");
+		return -1;
+	}
+
+	if ((contact = (u2upNodeRingContactStruct *)evm_message_data_get(msg)) == NULL) {
+		evm_log_error("evm_message_data_get() failed!\n");
+		return -1;
+	}
+
+	/* Set contact into the message. */
+	contact->id = id;
+	contact->addr = addr;
+	/* Set destination node as context. */
+	evm_message_ctx_set(msg, (void *)node);
+	/* Send protocom message with contact to another node. */
+	evm_message_pass(consumer, msg);
+
+	return 0;
+}
+
+static int send_protocol_init_msg(evmConsumerStruct *consumer, u2upNetNodeStruct *node, unsigned int id, uint32_t addr)
+{
+#if 0 /*spog - orig*/
+	evmMessageStruct *msg;
+	u2upNodeRingContactStruct *contact = NULL;
+#endif
+	evm_log_info("(entry) consumer=%p, node=%p, addr=%u\n", consumer, node, addr);
+
+	if ((consumer == NULL) || (node == NULL))
+		return -1;
+
+#if 0 /*spog - orig*/
+	if ((msg = evm_message_new(msgtype_ptr, msgid_init_ptr, sizeof(u2upNodeRingContactStruct))) == NULL) {
 		evm_log_error("evm_message_new() failed!\n");
 		return -1;
 	}
@@ -149,6 +198,59 @@ static int send_protocol_init_msg(evmConsumerStruct *consumer, u2upNetNodeStruct
 	evm_message_ctx_set(msg, (void *)node);
 	/* Send Initial random contact to the node. */
 	evm_message_pass(consumer, msg);
+#else
+	if (send_protocol_msg(consumer, msgid_init_ptr, node, id, addr) != 0)
+		return -1;
+#endif
+
+	return 0;
+}
+
+static int send_protocol_near_req_msg(evmConsumerStruct *consumer, u2upNetNodeStruct *node, unsigned int id, uint32_t addr)
+{
+#if 0 /*spog - orig*/
+	evmMessageStruct *msg;
+	u2upNodeRingContactStruct *contact = NULL;
+#endif
+	evm_log_info("(entry) consumer=%p, node=%p, addr=%u\n", consumer, node, addr);
+
+	if ((consumer == NULL) || (node == NULL))
+		return -1;
+
+#if 0 /*spog - orig*/
+	if ((msg = evm_message_new(msgtype_ptr, msgid_near_req_ptr, sizeof(u2upNodeRingContactStruct))) == NULL) {
+		evm_log_error("evm_message_new() failed!\n");
+		return -1;
+	}
+
+	if ((contact = (u2upNodeRingContactStruct *)evm_message_data_get(req_msg)) == NULL) {
+		evm_log_error("evm_message_data_get() failed!\n");
+		return -1;
+	}
+	/*set own node contact into the message*/
+	contact->id = id;
+	contact->addr = addr;
+
+	evm_message_ctx_set(msg, (void *)node);
+	/* Send near_req message to the contact node. */
+	evm_message_pass(consumer, msg);
+#else
+	if (send_protocol_msg(consumer, msgid_near_req_ptr, node, id, addr) != 0)
+		return -1;
+#endif
+
+	return 0;
+}
+
+static int send_protocol_near_repl_msg(evmConsumerStruct *consumer, u2upNetNodeStruct *node, unsigned int id, uint32_t addr)
+{
+	evm_log_info("(entry) consumer=%p, node=%p, addr=%u\n", consumer, node, addr);
+
+	if ((consumer == NULL) || (node == NULL))
+		return -1;
+
+	if (send_protocol_msg(consumer, msgid_near_repl_ptr, node, id, addr) != 0)
+		return -1;
 
 	return 0;
 }
@@ -156,183 +258,120 @@ static int send_protocol_init_msg(evmConsumerStruct *consumer, u2upNetNodeStruct
 /* PROTOCOL event handlers */
 static int evProtocolInitMsg(evmConsumerStruct *consumer, evmMessageStruct *msg)
 {
-	u2upNetNodeStruct *node;
+	u2upNetNodeStruct *node, *req_node;
 	u2upNodeRingContactStruct *contact = NULL;
-	evm_log_info("(cb entry) msgr=%p\n", msg);
+	evm_log_info("(cb entry) msg=%p\n", msg);
 
-	if (msg == NULL)
+	if ((consumer == NULL) || (msg == NULL))
 		return -1;
-
-	if ((contact = (u2upNodeRingContactStruct *)evm_message_data_get(msg)) == NULL)
-		return -1;
-	evm_log_info("INIT msg received: contact: %u@%.8u\n", contact->id, contact->addr);
 
 	if ((node = evm_message_ctx_get(msg)) == NULL)
 		return -1;
 
-	insertNodeContact(node, contact->id, contact->addr);
+	if ((contact = (u2upNodeRingContactStruct *)evm_message_data_get(msg)) == NULL)
+		return -1;
+
+	evm_log_info("(node id: %u) INIT msg received: contact: %u@%.8u\n", node->ctacts->myself->id, contact->id, contact->addr);
+
+	if (insertNodeContact(node, contact->id, contact->addr) == NULL)
+		return -1;
+
+#if 1 /*spog - orig*/
+	/*set protocol timeout to find nearest nodes*/
+	node->tmrNearReq = protocol_start_timer(node->tmrNearReq, 3, 0, (void *)node, tmridNearReq);
+#endif
+
+	req_node = &nodes[contact->id];
+	if (send_protocol_near_req_msg(consumer, req_node, node->ctacts->myself->id, node->ctacts->myself->addr) != 0)
+		return -1;
+
 	return 0;
 }
 
-static u2upNodeRingContactStruct * newU2upNodeContact(unsigned int id, uint32_t addr)
+static int handleTmrNearReq(evmConsumerStruct *consumer, evmTimerStruct *tmr)
 {
-	u2upNodeRingContactStruct *new = (u2upNodeRingContactStruct *)calloc(1, sizeof(u2upNodeRingContactStruct));
-
-	if (new == NULL)
-		abort();
-
-	new->id = id;
-	new->addr = addr;
-
-	return new;
-}
-
-static u2upNodeRingContactStruct * insertNodeContact(u2upNetNodeStruct *node, unsigned int id, uint32_t addr)
-{
+	u2upNetNodeStruct *node, *req_node;
 	u2upNodeRingContactStruct *tmp = NULL;
-	u2upNodeRingContactStruct *new = NULL;
+	evm_log_info("(cb entry) tmr=%p\n", tmr);
 
-	if (node == NULL)
-		abort();
+	if ((node = evm_timer_ctx_get(tmr)) == NULL)
+		return -1;
 
-	pthread_mutex_lock(&node->amtx);
+	evm_log_info("(node id: %u) NEAR REQUEST started:\n", node->ctacts->myself->id);
 
-	if (node->first_contact == NULL) {
-		new = newU2upNodeContact(id, addr);
-		new->next = new;
-		new->prev = new;
-		node->first_contact = new;
-	} else {
-		tmp = node->first_contact;
-		do {
-			if (tmp->addr == addr) { /*already inserted*/
-				if (tmp->id == id) /*with same ID -> OK, otherwise NULL*/
-					new = tmp;
-				pthread_mutex_unlock(&node->amtx);
-				return new;
-			}
-			if (tmp->addr > addr) {
-				new = newU2upNodeContact(id, addr);
-				new->next = tmp;
-				new->prev = tmp->prev;
-				tmp->prev->next = new;
-				tmp->prev = new;
-				/*TODO - maybe ->prev is closer*/
-				if ((node->ringAddr->addr - addr) < (node->ringAddr->addr - node->first_contact->addr))
-					node->first_contact = new;
-				pthread_mutex_unlock(&node->amtx);
-				return new;
-			}
-			tmp = tmp->next;
-		} while (tmp != node->first_contact);
+	tmp = node->ctacts->myself->next;
+	do {
+		if (tmp->own != 1) {
+			req_node = &nodes[tmp->id];
+			if (send_protocol_near_req_msg(consumer, req_node, node->ctacts->myself->id, node->ctacts->myself->addr) != 0)
+				return -1;
+			evm_log_info("(node id: %u) NEAR REQUEST sent to: %u@%.8u\n", node->ctacts->myself->id, req_node->ctacts->myself->id, req_node->ctacts->myself->addr);
+		}
+		tmp = tmp->next;
+	} while (tmp != node->ctacts->myself);
 
-		new = newU2upNodeContact(id, addr);
-		new->next = tmp;
-		new->prev = tmp->prev;
-		tmp->prev->next = new;
-		tmp->prev = new;
-		/*TODO - maybe ->prev is closer*/
-		if ((node->ringAddr->addr - addr) < (node->ringAddr->addr - node->first_contact->addr))
-			node->first_contact = new;
-	}
+	/*set protocol timeout to find nearest nodes*/
+	node->tmrNearReq = protocol_start_timer(node->tmrNearReq, 1, 0, (void *)node, tmridNearReq);
 
-	pthread_mutex_unlock(&node->amtx);
-	return new;
+	return 0;
 }
 
-static u2upNodeRingContactStruct * deleteNodeContact(u2upNetNodeStruct *node, uint32_t addr)
+static int evProtocolNearReqMsg(evmConsumerStruct *consumer, evmMessageStruct *msg)
 {
-	u2upNodeRingContactStruct *tmp = NULL;
+	u2upNetNodeStruct *node, *repl_node;
+	u2upNodeRingContactStruct *contact = NULL;
+	u2upNodeRingContactStruct *near_contact = NULL;
+	evm_log_info("(cb entry) msg=%p\n", msg);
 
-	if (node == NULL)
-		abort();
+	if ((consumer == NULL) || (msg == NULL))
+		return -1;
 
-	pthread_mutex_lock(&node->amtx);
+	if ((node = evm_message_ctx_get(msg)) == NULL)
+		return -1;
 
-	if (node->first_contact == NULL) {
-		pthread_mutex_unlock(&node->amtx);
-		return NULL;
-	} else {
-		tmp = node->first_contact;
-		do {
-			if (tmp->addr == addr) { /*address found -> DELETE -> return tmp*/
-				tmp->prev->next = tmp->next;
-				tmp->next->prev = tmp->prev;
-				if (node->first_contact == tmp) /*TODO - maybe ->prev is closer*/
-					node->first_contact = tmp->next;
-				free(tmp);
-				pthread_mutex_unlock(&node->amtx);
-				return tmp;
-			}
-			tmp = tmp->next;
-		} while (tmp != node->first_contact);
-	}
+	if ((contact = (u2upNodeRingContactStruct *)evm_message_data_get(msg)) == NULL)
+		return -1;
 
-	pthread_mutex_unlock(&node->amtx);
-	return NULL;
+	evm_log_info("(node id: %u) NEAR REQUEST msg received: contact: %u@%.8u\n", node->ctacts->myself->id, contact->id, contact->addr);
+
+	if (insertNearAddrContact(node, contact->id, contact->addr) == NULL)
+		return -1;
+
+	repl_node = &nodes[contact->id];
+	if ((near_contact = findNearNextContact(node, contact->addr)) == NULL)
+		return -1;
+	if (send_protocol_near_repl_msg(consumer, repl_node, near_contact->id, near_contact->addr) != 0)
+		return -1;
+
+	if ((near_contact = findNearPrevContact(node, contact->addr)) == NULL)
+		return -1;
+	if (send_protocol_near_repl_msg(consumer, repl_node, near_contact->id, near_contact->addr) != 0)
+		return -1;
+
+	return 0;
 }
 
-static u2upNetRingAddrStruct * newU2upNetAddr(uint32_t addr)
+static int evProtocolNearReplMsg(evmConsumerStruct *consumer, evmMessageStruct *msg)
 {
-	u2upNetRingAddrStruct *new = (u2upNetRingAddrStruct *)calloc(1, sizeof(u2upNetRingAddrStruct));
+	u2upNetNodeStruct *node;
+	u2upNodeRingContactStruct *contact = NULL;
+	evm_log_info("(cb entry) msg=%p\n", msg);
 
-	if (new == NULL)
-		abort();
+	if ((consumer == NULL) || (msg == NULL))
+		return -1;
 
-	new->addr = addr;
+	if ((node = evm_message_ctx_get(msg)) == NULL)
+		return -1;
 
-	return new;
-}
+	if ((contact = (u2upNodeRingContactStruct *)evm_message_data_get(msg)) == NULL)
+		return -1;
 
-static u2upNetRingAddrStruct * insertNewNetAddr(u2upNetRingHeadStruct *ring, uint32_t addr)
-{
-	u2upNetRingAddrStruct *tmp = NULL;
-	u2upNetRingAddrStruct *new = NULL;
+	evm_log_info("(node id: %u) NEAR REPLY msg received: contact: %u@%.8u\n", node->ctacts->myself->id, contact->id, contact->addr);
 
-	if (ring == NULL)
-		abort();
+	if (insertNearAddrContact(node, contact->id, contact->addr) == NULL)
+		return -1;
 
-	pthread_mutex_lock(&ring->amtx);
-
-	if (ring->first == NULL) {
-		new = newU2upNetAddr(addr);
-		new->next = new;
-		new->prev = new;
-		ring->first = new;
-	} else {
-		tmp = ring->first;
-		do {
-			if (tmp->addr == addr) {
-				pthread_mutex_unlock(&ring->amtx);
-				return NULL;
-			}
-			if (tmp->addr > addr) {
-				new = newU2upNetAddr(addr);
-				new->next = tmp;
-				new->prev = tmp->prev;
-				tmp->prev->next = new;
-				tmp->prev = new;
-				/*TODO - maybe ->prev is closer*/
-				if (addr < ring->first->addr)
-					ring->first = new;
-				pthread_mutex_unlock(&ring->amtx);
-				return new;
-			}
-			tmp = tmp->next;
-		} while (tmp != ring->first);
-
-		new = newU2upNetAddr(addr);
-		new->next = tmp;
-		new->prev = tmp->prev;
-		tmp->prev->next = new;
-		tmp->prev = new;
-		/*TODO - maybe ->prev is closer*/
-		if (addr < ring->first->addr)
-			ring->first = new;
-	}
-
-	pthread_mutex_unlock(&ring->amtx);
-	return new;
+	return 0;
 }
 
 static u2upNetRingAddrStruct * generateNewNetAddr(u2upNetRingHeadStruct *ring)
@@ -376,7 +415,7 @@ int dump_u2up_net_ring(u2upNetRingHeadStruct *ring)
 		ring_addr = ring->first;
 		if (ring_addr != NULL) {
 			do {
-				fprintf(file, "\"%.8x\" [label=\"%.8x\\n(%u)\"];\n", ring_addr->addr, ring_addr->addr, ring_addr->node->id);
+				fprintf(file, "\"%.8x\" [label=\"%.8x\\n(%u)\"];\n", ring_addr->addr, ring_addr->addr, ring_addr->node->ctacts->myself->id);
 				fprintf(file, "\"%.8x\" -> \"%.8x\" [color=black,arrowsize=0,style=dotted];\n", ring_addr->addr, ring_addr->next->addr);
 				fprintf(file, "\"%.8x\" -> \"%.8x\" [color=black,arrowsize=0,style=dotted];\n", ring_addr->addr, ring_addr->prev->addr);
 				ring_addr = ring_addr->next;
@@ -387,12 +426,12 @@ int dump_u2up_net_ring(u2upNetRingHeadStruct *ring)
 		ring_addr = ring->first;
 		if (ring_addr != NULL) {
 			do {
-				ctact = ring_addr->node->first_contact;
+				ctact = ring_addr->node->ctacts->myself;
 				if (ctact != NULL) {
 					do {
 						fprintf(file, "\"%.8x\" -> \"%.8x\" [color=black,arrowsize=0.7];\n", ring_addr->addr, ctact->addr);
 						ctact = ctact->next;
-					} while (ctact != ring_addr->node->first_contact);
+					} while (ctact != ring_addr->node->ctacts->myself);
 				}
 				ring_addr = ring_addr->next;
 			} while (ring_addr != ring->first);
@@ -425,16 +464,19 @@ static int handleTmrAuthBatch(evmConsumerStruct *consumer, evmTimerStruct *tmr)
 		evm_log_notice("(%d nodes)\n", next_node);
 		for (i = 0; i < batch_nodes; i++) {
 			if (next_node < max_nodes) {
-				nodes[next_node].first_contact = NULL;
 				nodes[next_node].ringAddr = generateNewNetAddr(&net_addr_ring);
-				nodes[next_node].id = next_node;
+				nodes[next_node].maxCtacts = 7;
+				nodes[next_node].numCtacts = 0;
+				if (insertNodeMyself(&nodes[next_node], next_node, nodes[next_node].ringAddr->addr) == NULL)
+					abort();
 				pthread_mutex_init(&nodes[next_node].amtx, NULL);
 				pthread_mutex_unlock(&nodes[next_node].amtx);
 				nodes[next_node].consumer = protocol_consumer;
+				nodes[next_node].tmrNearReq = NULL;
 				nodes[next_node].ringAddr->node = &nodes[next_node];
 				if (next_node > 0) {
 					rand_id = rand() % next_node;
-					send_protocol_init_msg(protocol_consumer, &nodes[next_node], nodes[rand_id].id, nodes[rand_id].ringAddr->addr);
+					send_protocol_init_msg(protocol_consumer, &nodes[next_node], nodes[rand_id].ctacts->myself->id, nodes[rand_id].ctacts->myself->addr);
 				}
 				next_node++;
 			} else {
@@ -446,7 +488,7 @@ static int handleTmrAuthBatch(evmConsumerStruct *consumer, evmTimerStruct *tmr)
 
 	if ((tmrid_ptr = evm_tmrid_get(evm, TMR_ID_AUTH_BATCH)) == NULL)
 		abort();
-	tmrAuthBatch = hello_start_timer(tmrAuthBatch, 1, 0, NULL, tmrid_ptr);
+	tmrAuthBatch = auth_start_timer(tmrAuthBatch, 1, 0, NULL, tmrid_ptr);
 	evm_log_debug("AUTH_BATCH timer set: 1 s\n");
 
 	return 0;
@@ -490,27 +532,30 @@ static int simulation_evm_init(void)
 			evm_log_error("evm_msgtype_add() failed!\n");
 			rv = -1;
 		}
-		if ((rv == 0) && ((msgid_ptr = evm_msgid_add(msgtype_ptr, EV_ID_PROTOCOL_MSG_INIT)) == NULL)) {
+		if ((rv == 0) && ((msgid_init_ptr = evm_msgid_add(msgtype_ptr, EV_ID_PROTOCOL_MSG_INIT)) == NULL)) {
 			evm_log_error("evm_msgid_add() failed!\n");
 			rv = -1;
 		}
-		if ((rv == 0) && (evm_msgid_cb_handle_set(msgid_ptr, evProtocolInitMsg) < 0)) {
+		if ((rv == 0) && (evm_msgid_cb_handle_set(msgid_init_ptr, evProtocolInitMsg) < 0)) {
 			evm_log_error("evm_msgid_cb_handle() failed!\n");
 			rv = -1;
 		}
-#if 0
-		if ((rv == 0) && ((helloMsg = evm_message_new(msgtype_ptr, msgid_ptr, sizeof(struct iovec))) == NULL)) {
-			evm_log_error("evm_message_new() failed!\n");
+		if ((rv == 0) && ((msgid_near_req_ptr = evm_msgid_add(msgtype_ptr, EV_ID_PROTOCOL_MSG_NEAR_REQ)) == NULL)) {
+			evm_log_error("evm_msgid_add() failed!\n");
 			rv = -1;
 		}
-		if (rv == 0) {
-			evm_message_persistent_set(helloMsg);
-			if ((iov_buff = (struct iovec *)evm_message_data_get(helloMsg)) == NULL)
-				rv = -1;
-			else
-				iov_buff->iov_base = msg_buff;
+		if ((rv == 0) && (evm_msgid_cb_handle_set(msgid_near_req_ptr, evProtocolNearReqMsg) < 0)) {
+			evm_log_error("evm_msgid_cb_handle() failed!\n");
+			rv = -1;
 		}
-#endif
+		if ((rv == 0) && ((msgid_near_repl_ptr = evm_msgid_add(msgtype_ptr, EV_ID_PROTOCOL_MSG_NEAR_REPL)) == NULL)) {
+			evm_log_error("evm_msgid_add() failed!\n");
+			rv = -1;
+		}
+		if ((rv == 0) && (evm_msgid_cb_handle_set(msgid_near_repl_ptr, evProtocolNearReplMsg) < 0)) {
+			evm_log_error("evm_msgid_cb_handle() failed!\n");
+			rv = -1;
+		}
 	} else {
 		evm_log_error("evm_init() failed!\n");
 		rv = -1;
@@ -520,7 +565,7 @@ static int simulation_evm_init(void)
 }
 
 /* Protocol processing thread */
-static void * simulation_protocol_start(void *arg)
+static void * simulation_protocol_run(void *arg)
 {
 	evmConsumerStruct *consumer;
 
@@ -531,6 +576,15 @@ static void * simulation_protocol_start(void *arg)
 
 	consumer = (evmConsumerStruct *)arg;
 
+	/* Prepare NEAR_REQ timer */
+	if ((tmridNearReq = evm_tmrid_add(evm, TMR_ID_NEAR_REQ)) == NULL) {
+		evm_log_error("evm_tmrid_add() failed!\n");
+		abort();
+	}
+	if (evm_tmrid_cb_handle_set(tmridNearReq, handleTmrNearReq) < 0) {
+		evm_log_error("evm_tmrid_cb_handle_set() failed!\n");
+		abort();
+	}
 	/*
 	 * Aditional thread EVM processing (event loop)
 	 */
@@ -551,11 +605,11 @@ static int simulation_authority_run(void)
 	if ((rv = pthread_attr_init(&attr)) != 0)
 		evm_log_return_system_err("pthread_attr_init()\n");
 
-	if ((rv = pthread_create(&protocol_thread, &attr, simulation_protocol_start, (void *)protocol_consumer)) != 0)
+	if ((rv = pthread_create(&protocol_thread, &attr, simulation_protocol_run, (void *)protocol_consumer)) != 0)
 		evm_log_return_system_err("pthread_create()\n");
 	evm_log_debug("pthread_create() rv=%d\n", rv);
 
-	/* Set initial IDLE timer */
+	/* Prepare AUTH_BATCH periodic timer */
 	if ((tmrid_ptr = evm_tmrid_add(evm, TMR_ID_AUTH_BATCH)) == NULL) {
 		evm_log_error("evm_tmrid_add() failed!\n");
 		abort();
@@ -564,7 +618,7 @@ static int simulation_authority_run(void)
 		evm_log_error("evm_tmrid_cb_handle_set() failed!\n");
 		abort();
 	}
-	tmrAuthBatch = hello_start_timer(NULL, 1, 0, NULL, tmrid_ptr);
+	tmrAuthBatch = auth_start_timer(NULL, 1, 0, NULL, tmrid_ptr);
 	evm_log_notice("AUTH_BATCH timer set: 1 s\n");
 
 #if 0
@@ -573,7 +627,7 @@ static int simulation_authority_run(void)
 		return -1;
 	if (evm_tmrid_cb_handle_set(tmrid_ptr, evHelloTmrQuit) < 0)
 		return -1;
-	helloQuitTmr = hello_start_timer(NULL, 60, 0, NULL, tmrid_ptr);
+	helloQuitTmr = start_timer(NULL, 60, 0, NULL, tmrid_ptr);
 	evm_log_notice("QUIT timer set: 60 s\n");
 #endif
 
@@ -756,6 +810,23 @@ static int usage_check(int argc, char *argv[])
 	printf("batch_nodes = %u\n", batch_nodes);
 	printf("max_nodes = %u\n", max_nodes);
 	printf("outfile = %s\n", outfile);
+	printf("distance from 0xffffffff to 0x0 = %d\n", calcDistance((uint32_t)0xffffffff, (uint32_t)0x0));
+	printf("distance from 0x1 to 0xffffffff = %d\n", calcDistance((uint32_t)0x1, (uint32_t)0xffffffff));
+	printf("distance from 0x7fffffff to 0x0 = %d\n", calcDistance((uint32_t)0x7fffffff, (uint32_t)0x0));
+	printf("distance from 0x1 to 0x7fffffff = %d\n", calcDistance((uint32_t)0x1, (uint32_t)0x7fffffff));
+	printf("distance from 0x80000000 to 0x0 = %d\n", calcDistance((uint32_t)0x80000000, (uint32_t)0x0));
+	printf("distance from 0x80000001 to 0x0 = %d\n", calcDistance((uint32_t)0x80000001, (uint32_t)0x0));
+	printf("distance from 0x1 to 0x80000000 = %d\n", calcDistance((uint32_t)0x1, (uint32_t)0x80000000));
+	printf("distance from 0x1 to 0x80000001 = %d\n", calcDistance((uint32_t)0x1, (uint32_t)0x80000001));
+	printf("distance from 0x1 to 0x80000002 = %d\n", calcDistance((uint32_t)0x1, (uint32_t)0x80000002));
+	printf("distance from 0x7ffffffd to 0x80000003 = %d\n", calcDistance((uint32_t)0x7ffffffd, (uint32_t)0x80000003));
+	printf("distance from 0x7ffffffe to 0x80000003 = %d\n", calcDistance((uint32_t)0x7ffffffe, (uint32_t)0x80000003));
+	printf("distance from 0x7fffffff to 0x80000003 = %d\n", calcDistance((uint32_t)0x7fffffff, (uint32_t)0x80000003));
+	printf("distance from 0x80000000 to 0x80000003 = %d\n", calcDistance((uint32_t)0x80000000, (uint32_t)0x80000003));
+	printf("distance from 0x80000001 to 0x80000003 = %d\n", calcDistance((uint32_t)0x80000001, (uint32_t)0x80000003));
+	printf("distance from 0x80000002 to 0x80000003 = %d\n", calcDistance((uint32_t)0x80000002, (uint32_t)0x80000003));
+	printf("distance from 0x80000003 to 0x80000003 = %d\n", calcDistance((uint32_t)0x80000003, (uint32_t)0x80000003));
+	printf("distance = %d\n", calcDistance((uint32_t)6, (uint32_t)6));
 #endif
 	return 0;
 }

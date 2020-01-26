@@ -34,28 +34,36 @@
 #endif
 
 typedef struct u2up_node_addr_list u2upNetAddrListStruct;
+typedef struct u2up_node_ring_contact u2upNodeRingContactStruct;
+typedef struct u2up_node_own_ctact u2upNodeOwnCtactStruct;
+typedef struct u2up_net_ring_addr u2upNetRingAddrStruct;
+
 struct u2up_node_addr_list {
 	uint32_t addr;
 	u2upNetAddrListStruct *next;
 }; /*u2upNetAddrListStruct*/
 
-typedef struct u2up_node_ring_contact u2upNodeRingContactStruct;
-
 struct u2up_node_ring_contact {
 	uint32_t addr;
 	unsigned int id;
+	unsigned int own;
 	u2upNodeRingContactStruct *next;
 	u2upNodeRingContactStruct *prev;
 }; /*u2upNodeRingContactStruct*/
 
-typedef struct u2up_net_ring_addr u2upNetRingAddrStruct;
+struct u2up_node_own_ctact {
+	u2upNodeRingContactStruct *myself;
+	u2upNodeOwnCtactStruct *next;
+}; /*u2upNodeOwnCtactStruct*/
 
 typedef struct u2up_net_node {
 	pthread_mutex_t amtx;
-	unsigned int id;
+	unsigned int maxCtacts; /*excluding ownCtacts*/
+	unsigned int numCtacts; /*excluding ownCtacts*/
 	u2upNetRingAddrStruct *ringAddr;
-	u2upNodeRingContactStruct *first_contact;
+	u2upNodeOwnCtactStruct *ctacts;
 	evmConsumerStruct *consumer;
+	evmTimerStruct *tmrNearReq;
 } u2upNetNodeStruct;
 
 struct u2up_net_ring_addr {
