@@ -109,7 +109,7 @@ u2upNodeRingContactStruct * insertNodeMyself(u2upNetNodeStruct *node, unsigned i
 		new = own->myself;
 		tmp = node->ctacts->myself;
 		do {
-			if (tmp->addr == addr) { /*contact address existing (shouldn't happen) -> REPLACE IT*/
+			if (tmp->addr == addr) { /*NOT own contact address existing (if happens -> REPLACE IT)*/
 				new->prev = tmp->prev;
 				new->next = tmp->next;
 				tmp->prev->next = new;
