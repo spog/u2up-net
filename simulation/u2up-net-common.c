@@ -141,13 +141,14 @@ static u2upNodeRingContactStruct * _deleteNextContact(u2upNetNodeStruct *node, u
 
 	tmp = ctact;
 	do {
-		if (tmp->own == 0)
+		/*Skip own contacts*/
+		if (tmp->own != 1)
 			break;
 		tmp = tmp->next;
 	} while (tmp != ctact);
-	if ((tmp != tmp->prev) && (tmp != tmp->next) && (tmp->own == 0)) {
-		tmp->prev = tmp->next;
-		tmp->next = tmp->prev;
+	if ((tmp != tmp->prev) && (tmp != tmp->next) && (tmp->own != 1)) {
+		tmp->prev->next = tmp->next;
+		tmp->next->prev = tmp->prev;
 		free(tmp);
 		node->numCtacts--;
 		return tmp;
@@ -164,13 +165,14 @@ static u2upNodeRingContactStruct * _deletePrevContact(u2upNetNodeStruct *node, u
 
 	tmp = ctact;
 	do {
-		if (tmp->own == 0)
+		/*Skip own contacts*/
+		if (tmp->own != 1)
 			break;
 		tmp = tmp->prev;
 	} while (tmp != ctact);
-	if ((tmp != tmp->prev) && (tmp != tmp->next) && (tmp->own == 0)) {
-		tmp->prev = tmp->next;
-		tmp->next = tmp->prev;
+	if ((tmp != tmp->prev) && (tmp != tmp->next) && (tmp->own != 1)) {
+		tmp->prev->next = tmp->next;
+		tmp->next->prev = tmp->prev;
 		free(tmp);
 		node->numCtacts--;
 		return tmp;
@@ -225,7 +227,7 @@ u2upNodeRingContactStruct * insertNodeContact(u2upNetNodeStruct *node, unsigned 
 		}
 		dist2next = calcDistance(node->ctacts->myself->addr, tmpNext->addr);
 		dist2prev = calcDistance(node->ctacts->myself->addr, tmpNext->addr);
-		if ((tmpNext == tmpNext->next) || (abs(dist2next) > abs(dist2myself))) { /*insertion point found*/
+		if ((tmpNext->next->addr != addr) && ((tmpNext == tmpNext->next) || (abs(dist2next) > abs(dist2myself)))) { /*insertion point found*/
 			if ((new = newU2upNodeContact(id, addr)) == NULL)
 				abort();
 			new->next = tmpNext;
@@ -237,7 +239,7 @@ u2upNodeRingContactStruct * insertNodeContact(u2upNetNodeStruct *node, unsigned 
 				_deleteNextContact(node, new->next);
 			break;
 		}
-		if ((tmpPrev == tmpPrev->prev) || (abs(dist2prev) > abs(dist2myself))) { /*insertion point found*/
+		if ((tmpPrev->prev->addr != addr) && ((tmpPrev == tmpPrev->prev) || (abs(dist2prev) > abs(dist2myself)))) { /*insertion point found*/
 			if ((new = newU2upNodeContact(id, addr)) == NULL)
 				abort();
 			new->next = tmpPrev;
@@ -361,10 +363,10 @@ u2upNodeRingContactStruct * deleteNodeMyself(u2upNetNodeStruct *node, uint32_t a
  */
 u2upNodeRingContactStruct * findNearNextContact(u2upNetNodeStruct *node, uint32_t addr)
 {
-	int32_t my_distance = 0, my_tmp = 0;
+	int32_t own_dist = 0, tmp_dist = 0;
 	u2upNodeOwnCtactStruct *own = NULL;
 	u2upNodeOwnCtactStruct *nearest_own = NULL;
-	u2upNodeRingContactStruct *my_contact = NULL;
+	u2upNodeRingContactStruct *tmp_contact = NULL;
 
 	if (node == NULL)
 		return NULL;
@@ -378,46 +380,50 @@ u2upNodeRingContactStruct * findNearNextContact(u2upNetNodeStruct *node, uint32_
 
 	/*First find closest of our own addresses*/
 	own = node->ctacts;
-	do {
-		my_tmp = calcDistance(own->myself->addr, addr);
-		if (my_distance == 0) {
-			my_distance = my_tmp;
+	nearest_own = own;
+	own_dist = calcDistance(own->myself->addr, addr);
+	own = own->next;
+	while (own != NULL) {
+		tmp_dist = calcDistance(own->myself->addr, addr);
+		if (tmp_dist == 0) {
+			own_dist = tmp_dist;
 			nearest_own = own;
+			break;
 		} else {
-			if (abs(my_tmp) < abs(my_distance)) {
-				my_distance = my_tmp;
+			if (abs(tmp_dist) < abs(own_dist)) {
+				own_dist = tmp_dist;
 				nearest_own = own;
 			}
 		}
 		own = own->next;
-	} while (own != NULL);
+	};
 
-	if (my_distance == 0) {
+	if (own_dist == 0) {
 		/* we are looking for closest to one of our own addresses - return nothing */
 		pthread_mutex_unlock(&node->amtx);
 		return NULL;
 	}
 
 	/*Find closest contact around our own closest address*/
-	my_contact = nearest_own->myself;
+	tmp_contact = nearest_own->myself;
 	do {
-		if (my_distance < 0) { /* addr is closer to us on the prev side of the contacts ring */
-			my_contact = my_contact->prev;
+		if (own_dist < 0) { /* addr is closer to us on the prev side of the contacts ring */
+			tmp_contact = tmp_contact->prev;
 			break;
 		} else { /* addr is closer to us on the next side of the contacts ring */
-			my_contact = my_contact->next;
+			tmp_contact = tmp_contact->next;
 		}
-		my_tmp = calcDistance(my_contact->addr, addr);
-		/* Skip contacts with "search" address! */
-		if (my_tmp == 0)
-			continue;
-	} while (abs(my_tmp) < abs(my_distance));
+		tmp_dist = calcDistance(tmp_contact->addr, addr);
+		/* Bumped into a contact with the "search" address! - Break, to use the one before */
+		if (tmp_dist == 0)
+			break;
+	} while ((abs(tmp_dist) < abs(own_dist)) && (tmp_contact != nearest_own->myself));
 
-	if (my_distance > 0)
-		my_contact = my_contact->prev;
+	if (own_dist > 0)
+		tmp_contact = tmp_contact->prev;
 
 	pthread_mutex_unlock(&node->amtx);
-	return my_contact;
+	return tmp_contact;
 }
 
 /*
@@ -432,10 +438,10 @@ u2upNodeRingContactStruct * findNearNextContact(u2upNetNodeStruct *node, uint32_
  */
 u2upNodeRingContactStruct * findNearPrevContact(u2upNetNodeStruct *node, uint32_t addr)
 {
-	int32_t my_distance = 0, my_tmp = 0;
+	int32_t own_dist = 0, tmp_dist = 0;
 	u2upNodeOwnCtactStruct *own = NULL;
 	u2upNodeOwnCtactStruct *nearest_own = NULL;
-	u2upNodeRingContactStruct *my_contact = NULL;
+	u2upNodeRingContactStruct *tmp_contact = NULL;
 
 	if (node == NULL)
 		return NULL;
@@ -449,46 +455,50 @@ u2upNodeRingContactStruct * findNearPrevContact(u2upNetNodeStruct *node, uint32_
 
 	/*First find closest of our own addresses*/
 	own = node->ctacts;
-	do {
-		my_tmp = calcDistance(own->myself->addr, addr);
-		if (my_distance == 0) {
-			my_distance = my_tmp;
+	nearest_own = own;
+	own_dist = calcDistance(own->myself->addr, addr);
+	own = own->next;
+	while (own != NULL) {
+		tmp_dist = calcDistance(own->myself->addr, addr);
+		if (tmp_dist == 0) {
+			own_dist = tmp_dist;
 			nearest_own = own;
+			break;
 		} else {
-			if (abs(my_tmp) < abs(my_distance)) {
-				my_distance = my_tmp;
+			if (abs(tmp_dist) < abs(own_dist)) {
+				own_dist = tmp_dist;
 				nearest_own = own;
 			}
 		}
 		own = own->next;
-	} while (own != NULL);
+	};
 
-	if (my_distance == 0) {
+	if (own_dist == 0) {
 		/* we are looking for closest to one of our own addresses - return nothing */
 		pthread_mutex_unlock(&node->amtx);
 		return NULL;
 	}
 
 	/*Find closest contact around our own closest address*/
-	my_contact = nearest_own->myself;
+	tmp_contact = nearest_own->myself;
 	do {
-		if (my_distance < 0) { /* addr is closer to us on the prev side of the contacts ring */
-			my_contact = my_contact->prev;
+		if (own_dist < 0) { /* addr is closer to us on the prev side of the contacts ring */
+			tmp_contact = tmp_contact->prev;
 		} else { /* addr is closer to us on the next side of the contacts ring */
-			my_contact = my_contact->next;
+			tmp_contact = tmp_contact->next;
 			break;
 		}
-		my_tmp = calcDistance(my_contact->addr, addr);
-		/* Skip contacts with "search" address! */
-		if (my_tmp == 0)
-			continue;
-	} while (abs(my_tmp) < abs(my_distance));
+		tmp_dist = calcDistance(tmp_contact->addr, addr);
+		/* Bumped into a contact with the "search" address! - Break, to use the one before */
+		if (tmp_dist == 0)
+			break;
+	} while ((abs(tmp_dist) < abs(own_dist)) && (tmp_contact != nearest_own->myself));
 
-	if (my_distance < 0)
-		my_contact = my_contact->next;
+	if (own_dist < 0)
+		tmp_contact = tmp_contact->next;
 
 	pthread_mutex_unlock(&node->amtx);
-	return my_contact;
+	return tmp_contact;
 }
 
 u2upNodeRingContactStruct * insertNearAddrContact(u2upNetNodeStruct *node, unsigned int id, uint32_t addr)
@@ -537,8 +547,8 @@ u2upNodeRingContactStruct * insertNearAddrContact(u2upNetNodeStruct *node, unsig
 			break;
 		}
 		dist2next = calcDistance(node->ctacts->myself->addr, tmpNext->addr);
-		dist2prev = calcDistance(node->ctacts->myself->addr, tmpNext->addr);
-		if ((tmpNext == tmpNext->next) || (abs(dist2next) > abs(dist2myself))) { /*insertion point found*/
+		dist2prev = calcDistance(node->ctacts->myself->addr, tmpPrev->addr);
+		if ((tmpNext->next->addr != addr) && ((tmpNext == tmpNext->next) || (abs(dist2next) > abs(dist2myself)))) { /*insertion point found*/
 			if ((new = newU2upNodeContact(id, addr)) == NULL)
 				abort();
 			new->next = tmpNext;
@@ -550,13 +560,13 @@ u2upNodeRingContactStruct * insertNearAddrContact(u2upNetNodeStruct *node, unsig
 				_deleteNextContact(node, new->next);
 			break;
 		}
-		if ((tmpPrev == tmpPrev->prev) || (abs(dist2prev) > abs(dist2myself))) { /*insertion point found*/
+		if ((tmpPrev->prev->addr != addr) && ((tmpPrev == tmpPrev->prev) || (abs(dist2prev) > abs(dist2myself)))) { /*insertion point found*/
 			if ((new = newU2upNodeContact(id, addr)) == NULL)
 				abort();
-			new->next = tmpPrev;
-			new->prev = tmpPrev->prev;
-			tmpPrev->prev->next = new;
-			tmpPrev->prev = new;
+			new->prev = tmpPrev;
+			new->next = tmpPrev->next;
+			tmpPrev->next->prev = new;
+			tmpPrev->next = new;
 			node->numCtacts++;
 			if (node->numCtacts > node->maxCtacts)
 				_deletePrevContact(node, new->prev);
@@ -564,7 +574,7 @@ u2upNodeRingContactStruct * insertNearAddrContact(u2upNetNodeStruct *node, unsig
 		}
 		tmpNext = tmpNext->next;
 		tmpPrev = tmpNext->prev;
-	} while ((tmpNext != node->ctacts->myself) || (tmpPrev != node->ctacts->myself));
+	} while (calcDistance(tmpPrev->addr, tmpNext->addr) > 0);
 
 	pthread_mutex_unlock(&node->amtx);
 	return new;
