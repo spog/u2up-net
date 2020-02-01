@@ -60,10 +60,11 @@ typedef struct u2up_net_node {
 	pthread_mutex_t amtx;
 	unsigned int maxCtacts; /*excluding ownCtacts*/
 	unsigned int numCtacts; /*excluding ownCtacts*/
+	unsigned int numOwns; /*number of own contacts*/
 	u2upNetRingAddrStruct *ringAddr;
 	u2upNodeOwnCtactStruct *ctacts;
 	evmConsumerStruct *consumer;
-	evmTimerStruct *tmrNearReq;
+	evmTimerStruct *tmrProtoRun;
 } u2upNetNodeStruct;
 
 struct u2up_net_ring_addr {

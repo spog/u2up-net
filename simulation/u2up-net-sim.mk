@@ -36,7 +36,7 @@ $(_OBJDIR_)/$(TARGET): $(_OBJS_)
 
 .PHONY: clean
 clean:
-	rm -f $(_OBJDIR_)/$(TARGET) $(_OBJDIR_)/$(TARGET).o $(_OBJDIR_)/$(TARGET).d
+	rm -f $(_OBJDIR_)/$(TARGET) $(_OBJDIR_)/$(TARGET).o $(_OBJDIR_)/$(TARGET).d $(_OBJDIR_)/u2up-net-common.o $(_OBJDIR_)/u2up-net-common.d
 
 .PHONY: install
 install: $(_INSTDIR_) $(_INSTDIR_)/$(TARGET)
