@@ -254,6 +254,11 @@ u2upNodeRingContactStruct * insertNodeContact(u2upNetNodeStruct *node, unsigned 
 		return NULL;
 	}
 
+	if (node->numCtacts >= node->maxCtacts) {
+		pthread_mutex_unlock(&node->amtx);
+		return NULL;
+	}
+
 	/*Check own addresses first - DO NOT CHANGE THEM HERE!*/
 	own = node->ctacts;
 	do {
@@ -291,8 +296,6 @@ u2upNodeRingContactStruct * insertNodeContact(u2upNetNodeStruct *node, unsigned 
 			tmpNext->prev->next = new;
 			tmpNext->prev = new;
 			node->numCtacts++;
-			if (node->numCtacts > node->maxCtacts)
-				_deleteNextContact(node, new->next);
 			break;
 		}
 		if ((tmpPrev->prev->addr != addr) && ((tmpPrev == tmpPrev->prev) || (uDist2prev < uDist2myself))) { /*insertion point found*/
@@ -303,8 +306,6 @@ u2upNodeRingContactStruct * insertNodeContact(u2upNetNodeStruct *node, unsigned 
 			tmpPrev->prev->next = new;
 			tmpPrev->prev = new;
 			node->numCtacts++;
-			if (node->numCtacts > node->maxCtacts)
-				_deletePrevContact(node, new->prev);
 			break;
 		}
 		if (uDist2next >= uDist2prev)
