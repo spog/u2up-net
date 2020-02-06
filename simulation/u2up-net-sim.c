@@ -508,7 +508,7 @@ static int handleTmrAuthBatch(evmConsumerStruct *consumer, evmTimerStruct *tmr)
 				nodes[next_node].ringAddr->node = &nodes[next_node];
 				pthread_mutex_init(&nodes[next_node].amtx, NULL);
 				pthread_mutex_unlock(&nodes[next_node].amtx);
-				if (insertNodeMyself(&nodes[next_node], next_node, nodes[next_node].ringAddr->addr) == NULL)
+				if (insertNodeOwnContact(&nodes[next_node], next_node, nodes[next_node].ringAddr->addr) == NULL)
 					abort();
 				pthread_mutex_lock(&nodes[next_node].amtx);
 				if (next_node > 0) {

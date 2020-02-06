@@ -51,11 +51,6 @@ struct u2up_node_ring_contact {
 	u2upNodeRingContactStruct *prev;
 }; /*u2upNodeRingContactStruct*/
 
-struct u2up_node_own_ctact {
-	u2upNodeRingContactStruct *myself;
-	u2upNodeOwnCtactStruct *next;
-}; /*u2upNodeOwnCtactStruct*/
-
 typedef struct u2up_net_node {
 	pthread_mutex_t amtx;
 	unsigned int maxCtacts; /*excluding ownCtacts*/
@@ -66,6 +61,12 @@ typedef struct u2up_net_node {
 	evmConsumerStruct *consumer;
 	evmTimerStruct *tmrProtoRun;
 } u2upNetNodeStruct;
+
+struct u2up_node_own_ctact {
+	u2upNetNodeStruct *ownNode;
+	u2upNodeRingContactStruct *myself;
+	u2upNodeOwnCtactStruct *next;
+}; /*u2upNodeOwnCtactStruct*/
 
 struct u2up_net_ring_addr {
 	uint32_t addr;
