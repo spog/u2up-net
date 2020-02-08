@@ -277,17 +277,21 @@ static int evProtocolInitMsg(evmConsumerStruct *consumer, evmMessageStruct *msg)
 static int handleTmrProtoRun(evmConsumerStruct *consumer, evmTimerStruct *tmr)
 {
 	u2upNetNodeStruct *node, *req_node;
+	u2upNodeOwnCtactStruct *ownCtact;
 	u2upNodeRingContactStruct *tmp = NULL;
 	evm_log_info("(cb entry) tmr=%p\n", tmr);
 
-	if ((node = evm_timer_ctx_get(tmr)) == NULL)
+	if ((ownCtact = (u2upNodeOwnCtactStruct *)evm_timer_ctx_get(tmr)) == NULL)
 		return -1;
 
-	evm_log_info("(node id: %u) PROTO RUN started:\n", node->ctacts->myself->id);
+	if ((node = ownCtact->ownNode) == NULL)
+		return -1;
+
+	evm_log_info("(node: %u@%.8u) PROTO RUN started:\n", ownCtact->myself->id, ownCtact->myself->addr);
 
 #if 1
 	/*set protocol timeout to find nearest nodes*/
-	node->tmrProtoRun = startTmrProtoRun(node->tmrProtoRun, 1, 0, (void *)node, tmridProtoRun);
+	ownCtact->tmrProtoRun = startTmrProtoRun(ownCtact->tmrProtoRun, 1, 0, (void *)ownCtact, tmridProtoRun);
 #endif
 
 	pthread_mutex_lock(&node->amtx);
@@ -295,7 +299,7 @@ static int handleTmrProtoRun(evmConsumerStruct *consumer, evmTimerStruct *tmr)
 	do {
 		if (tmp->own != 1) {
 			req_node = &nodes[tmp->id];
-			if (node->numCtacts < node->maxCtacts) {
+			if (ownCtact->numCtacts < node->maxCtacts) {
 				send_protocol_random_req_msg(consumer, req_node->ctacts, node->ctacts->myself->id, node->ctacts->myself->addr);
 				evm_log_info("(node: %u@%.8u) RANDOM REQUEST sent to: %u@%.8u\n",
 						node->ctacts->myself->id, node->ctacts->myself->addr, req_node->ctacts->myself->id, req_node->ctacts->myself->addr);
@@ -332,7 +336,7 @@ static int evProtocolRandomReqMsg(evmConsumerStruct *consumer, evmMessageStruct 
 
 #if 0
 	/*set protocol timeout to find nearest nodes*/
-	node->tmrProtoRun = startTmrProtoRun(node->tmrProtoRun, 1, 0, (void *)node, tmridProtoRun);
+	ownCtact->tmrProtoRun = startTmrProtoRun(ownCtact->tmrProtoRun, 1, 0, (void *)ownCtact, tmridProtoRun);
 #endif
 
 	if ((contact = (u2upNodeRingContactStruct *)evm_message_data_get(msg)) == NULL)
@@ -340,16 +344,12 @@ static int evProtocolRandomReqMsg(evmConsumerStruct *consumer, evmMessageStruct 
 
 	evm_log_info("(node: %u@%.8u) NEAR REQUEST msg received: contact: %u@%.8u\n", ownCtact->myself->id, ownCtact->myself->addr, contact->id, contact->addr);
 
-#if 0 /*spog - orig*/
-	insertRandomAddrContact(node, contact->id, contact->addr);
-#else
 	insertNodeContact(ownCtact, contact->id, contact->addr);
-#endif
 
 	if ((repl_ownCtact = getOwnCtact(contact->id, contact->addr)) == NULL)
 		return -1;
 
-	if ((random_contact = getRandomRemoteContact(node)) != NULL)
+	if ((random_contact = getRandomRemoteContact(ownCtact)) != NULL)
 		send_protocol_random_repl_msg(consumer, repl_ownCtact, random_contact->id, random_contact->addr);
 
 	return 0;
@@ -401,7 +401,7 @@ static int evProtocolNearReqMsg(evmConsumerStruct *consumer, evmMessageStruct *m
 
 #if 0
 	/*set protocol timeout to find nearest nodes*/
-	node->tmrProtoRun = startTmrProtoRun(node->tmrProtoRun, 1, 0, (void *)node, tmridProtoRun);
+	ownCtact->tmrProtoRun = startTmrProtoRun(ownCtact->tmrProtoRun, 1, 0, (void *)ownCtact, tmridProtoRun);
 #endif
 
 	if ((contact = (u2upNodeRingContactStruct *)evm_message_data_get(msg)) == NULL)
@@ -486,7 +486,7 @@ int dump_u2up_net_ring(u2upNetRingHeadStruct *ring)
 		ring_addr = ring->first;
 		if (ring_addr != NULL) {
 			do {
-				fprintf(file, "\"%.8x\" [label=\"%.8x\\n(%u: %u)\"];\n", ring_addr->addr, ring_addr->addr, ring_addr->node->ctacts->myself->id, ring_addr->node->numCtacts);
+				fprintf(file, "\"%.8x\" [label=\"%.8x\\n(%u: %u)\"];\n", ring_addr->addr, ring_addr->addr, ring_addr->ownCtact->myself->id, ring_addr->ownCtact->numCtacts);
 				fprintf(file, "\"%.8x\" -> \"%.8x\" [color=black,arrowsize=0,style=dotted];\n", ring_addr->addr, ring_addr->next->addr);
 				ring_addr = ring_addr->next;
 			} while (ring_addr != ring->first);
@@ -496,16 +496,16 @@ int dump_u2up_net_ring(u2upNetRingHeadStruct *ring)
 		ring_addr = ring->first;
 		if (ring_addr != NULL) {
 			do {
-				pthread_mutex_lock(&ring_addr->node->amtx);
-				ctact = ring_addr->node->ctacts->myself;
+				pthread_mutex_lock(&ring_addr->ownCtact->ownNode->amtx);
+				ctact = ring_addr->ownCtact->myself;
 				if (ctact != NULL) {
 					do {
 						if (ctact->own != 1)
 							fprintf(file, "\"%.8x\" -> \"%.8x\" [color=black,arrowsize=0.7];\n", ring_addr->addr, ctact->addr);
 						ctact = ctact->next;
-					} while (ctact != ring_addr->node->ctacts->myself);
+					} while (ctact != ring_addr->ownCtact->myself);
 				}
-				pthread_mutex_unlock(&ring_addr->node->amtx);
+				pthread_mutex_unlock(&ring_addr->ownCtact->ownNode->amtx);
 				ring_addr = ring_addr->next;
 			} while (ring_addr != ring->first);
 		}
@@ -523,6 +523,7 @@ static int handleTmrAuthBatch(evmConsumerStruct *consumer, evmTimerStruct *tmr)
 	int i;
 	unsigned int rand_id;
 	evmTmridStruct *tmrid_ptr;
+	u2upNetRingAddrStruct *ringAddr;
 	u2upNodeOwnCtactStruct *ownCtact;
 	evm_log_info("(cb entry) tmr=%p\n", tmr);
 
@@ -538,24 +539,23 @@ static int handleTmrAuthBatch(evmConsumerStruct *consumer, evmTimerStruct *tmr)
 		evm_log_notice("(%d nodes)\n", next_node);
 		for (i = 0; i < batch_nodes; i++) {
 			if (next_node < max_nodes) {
-				nodes[next_node].ringAddr = generateNewNetAddr(&net_addr_ring);
+				ringAddr = generateNewNetAddr(&net_addr_ring);
 				nodes[next_node].maxCtacts = 3;
-				nodes[next_node].numCtacts = 0;
 				nodes[next_node].numOwns = 0;
 				nodes[next_node].consumer = protocol_consumer;
-				nodes[next_node].tmrProtoRun = NULL;
-				nodes[next_node].ringAddr->node = &nodes[next_node];
 				pthread_mutex_init(&nodes[next_node].amtx, NULL);
 				pthread_mutex_unlock(&nodes[next_node].amtx);
-				if ((ownCtact = insertNodeOwnContact(&nodes[next_node], next_node, nodes[next_node].ringAddr->addr)) == NULL)
+				if ((ownCtact = insertNodeOwnContact(&nodes[next_node], next_node, ringAddr->addr)) == NULL)
 					abort();
 				pthread_mutex_lock(&nodes[next_node].amtx);
+				ownCtact->ringAddr = ringAddr;
+				ownCtact->ringAddr->ownCtact = ownCtact;
 				if (next_node > 0) {
 					rand_id = rand() % next_node;
 					send_protocol_init_msg(protocol_consumer, ownCtact, nodes[rand_id].ctacts->myself->id, nodes[rand_id].ctacts->myself->addr);
 				}
 				/*set protocol timeout to find nearest nodes*/
-				nodes[next_node].tmrProtoRun = startTmrProtoRun(nodes[next_node].tmrProtoRun, 3, 0, (void *)&nodes[next_node], tmridProtoRun);
+				ownCtact->tmrProtoRun = startTmrProtoRun(ownCtact->tmrProtoRun, 3, 0, (void *)ownCtact, tmridProtoRun);
 				pthread_mutex_unlock(&nodes[next_node].amtx);
 				next_node++;
 			} else {

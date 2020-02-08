@@ -76,6 +76,7 @@ u2upNodeOwnCtactStruct * newU2upNodeOwnContact(u2upNetNodeStruct *node, unsigned
 		free(new);
 		new = NULL;
 	}	
+	new->numCtacts = 0; /*number of per-own-address maintained remote contacts*/
 	new->ownNode = node; /*link to our own node structure*/
 	new->myself->own = 1; /*indicates that this contact represents our own node*/
 
@@ -188,11 +189,11 @@ u2upNodeOwnCtactStruct * insertNodeOwnContact(u2upNetNodeStruct *node, unsigned 
 	return own;
 }
 
-static u2upNodeRingContactStruct * _deleteNextContact(u2upNetNodeStruct *node, u2upNodeRingContactStruct *ctact)
+static u2upNodeRingContactStruct * _deleteNextContact(u2upNodeOwnCtactStruct *ownCtact, u2upNodeRingContactStruct *ctact)
 {
 	u2upNodeRingContactStruct *tmp = NULL;
 
-	if ((node == NULL) || (ctact == NULL))
+	if ((ownCtact == NULL) || (ctact == NULL))
 		return NULL;
 
 	tmp = ctact;
@@ -206,17 +207,17 @@ static u2upNodeRingContactStruct * _deleteNextContact(u2upNetNodeStruct *node, u
 		tmp->prev->next = tmp->next;
 		tmp->next->prev = tmp->prev;
 		free(tmp);
-		node->numCtacts--;
+		ownCtact->numCtacts--;
 		return tmp;
 	}
 	return NULL;
 }
 
-static u2upNodeRingContactStruct * _deletePrevContact(u2upNetNodeStruct *node, u2upNodeRingContactStruct *ctact)
+static u2upNodeRingContactStruct * _deletePrevContact(u2upNodeOwnCtactStruct *ownCtact, u2upNodeRingContactStruct *ctact)
 {
 	u2upNodeRingContactStruct *tmp = NULL;
 
-	if ((node == NULL) || (ctact == NULL))
+	if ((ownCtact == NULL) || (ctact == NULL))
 		return NULL;
 
 	tmp = ctact;
@@ -230,7 +231,7 @@ static u2upNodeRingContactStruct * _deletePrevContact(u2upNetNodeStruct *node, u
 		tmp->prev->next = tmp->next;
 		tmp->next->prev = tmp->prev;
 		free(tmp);
-		node->numCtacts--;
+		ownCtact->numCtacts--;
 		return tmp;
 	}
 	return NULL;
@@ -259,7 +260,7 @@ u2upNodeRingContactStruct * insertNodeContact(u2upNodeOwnCtactStruct *ownCtact, 
 		return NULL;
 	}
 
-	if (node->numCtacts >= node->maxCtacts) {
+	if (ownCtact->numCtacts >= node->maxCtacts) {
 		pthread_mutex_unlock(&node->amtx);
 		return NULL;
 	}
@@ -300,7 +301,7 @@ u2upNodeRingContactStruct * insertNodeContact(u2upNodeOwnCtactStruct *ownCtact, 
 			new->prev = tmpNext->prev;
 			tmpNext->prev->next = new;
 			tmpNext->prev = new;
-			node->numCtacts++;
+			ownCtact->numCtacts++;
 			break;
 		}
 		if ((tmpPrev->prev->addr != addr) && ((tmpPrev == tmpPrev->prev) || (uDist2prev < uDist2myself))) { /*insertion point found*/
@@ -310,7 +311,7 @@ u2upNodeRingContactStruct * insertNodeContact(u2upNodeOwnCtactStruct *ownCtact, 
 			new->prev = tmpPrev->prev;
 			tmpPrev->prev->next = new;
 			tmpPrev->prev = new;
-			node->numCtacts++;
+			ownCtact->numCtacts++;
 			break;
 		}
 		if (uDist2next >= uDist2prev)
@@ -415,6 +416,38 @@ u2upNodeRingContactStruct * deleteNodeMyself(u2upNetNodeStruct *node, uint32_t a
 	return NULL;
 }
 
+static int _getNumAllCtacts(u2upNetNodeStruct *node)
+{
+	int all = 0;
+	u2upNodeOwnCtactStruct *own = NULL;
+
+	if (node == NULL)
+		return 0;
+
+	own = node->ctacts;
+	while (own != NULL) {
+		all += own->numCtacts;
+		own = own->next;
+	}
+	all += node->numOwns;
+
+	return all;
+}
+
+int getNumAllCtacts(u2upNetNodeStruct *node)
+{
+	int all = 0;
+
+	if (node == NULL)
+		return 0;
+
+	pthread_mutex_lock(&node->amtx);
+	all = _getNumAllCtacts(node);
+	pthread_mutex_unlock(&node->amtx);
+
+	return all;
+}
+
 /*
  * Function: getRandomRemoteContact()
  * Description:
@@ -423,12 +456,16 @@ u2upNodeRingContactStruct * deleteNodeMyself(u2upNetNodeStruct *node, uint32_t a
  * - Contact pointer on a random remote contact.
  * - NULL, if no contacts available.
  */
-u2upNodeRingContactStruct * getRandomRemoteContact(u2upNetNodeStruct *node)
+u2upNodeRingContactStruct * getRandomRemoteContact(u2upNodeOwnCtactStruct *ownCtact)
 {
+	u2upNetNodeStruct *node = NULL;
 	u2upNodeRingContactStruct *tmp = NULL;
 	unsigned int rand_count, numAllCtacts = 0;
 
-	if (node == NULL)
+	if (ownCtact == NULL)
+		return NULL;
+
+	if ((node = ownCtact->ownNode) == NULL)
 		return NULL;
 
 	pthread_mutex_lock(&node->amtx);
@@ -438,7 +475,7 @@ u2upNodeRingContactStruct * getRandomRemoteContact(u2upNetNodeStruct *node)
 		return NULL;
 	}
 
-	if ((numAllCtacts = node->numCtacts + node->numOwns) == 0) {
+	if ((numAllCtacts = _getNumAllCtacts(node)) == 0) {
 		pthread_mutex_unlock(&node->amtx);
 		return NULL;
 	}
@@ -619,9 +656,9 @@ u2upNodeRingContactStruct * insertNearAddrContact(u2upNodeOwnCtactStruct *ownCta
 			new->prev = tmpNext->prev;
 			tmpNext->prev->next = new;
 			tmpNext->prev = new;
-			node->numCtacts++;
-			if (node->numCtacts > node->maxCtacts)
-				_deleteNextContact(node, new->next);
+			ownCtact->numCtacts++;
+			if (ownCtact->numCtacts > node->maxCtacts)
+				_deleteNextContact(ownCtact, new->next);
 			break;
 		}
 		if ((tmpPrev->prev->addr != addr) && ((tmpPrev == tmpPrev->prev) || (uDist2prev < uDist2myself))) { /*insertion point found*/
@@ -631,9 +668,9 @@ u2upNodeRingContactStruct * insertNearAddrContact(u2upNodeOwnCtactStruct *ownCta
 			new->next = tmpPrev->next;
 			tmpPrev->next->prev = new;
 			tmpPrev->next = new;
-			node->numCtacts++;
-			if (node->numCtacts > node->maxCtacts)
-				_deletePrevContact(node, new->prev);
+			ownCtact->numCtacts++;
+			if (ownCtact->numCtacts > node->maxCtacts)
+				_deletePrevContact(ownCtact, new->prev);
 			break;
 		}
 		if (uDist2next >= uDist2prev)

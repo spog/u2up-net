@@ -54,23 +54,23 @@ struct u2up_node_ring_contact {
 typedef struct u2up_net_node {
 	pthread_mutex_t amtx;
 	unsigned int maxCtacts; /*excluding ownCtacts*/
-	unsigned int numCtacts; /*excluding ownCtacts*/
 	unsigned int numOwns; /*number of own contacts*/
-	u2upNetRingAddrStruct *ringAddr;
 	u2upNodeOwnCtactStruct *ctacts;
 	evmConsumerStruct *consumer;
-	evmTimerStruct *tmrProtoRun;
 } u2upNetNodeStruct;
 
 struct u2up_node_own_ctact {
+	unsigned int numCtacts; /*excluding ownCtacts*/
 	u2upNetNodeStruct *ownNode;
 	u2upNodeRingContactStruct *myself;
 	u2upNodeOwnCtactStruct *next;
+	evmTimerStruct *tmrProtoRun;
+	u2upNetRingAddrStruct *ringAddr;
 }; /*u2upNodeOwnCtactStruct*/
 
 struct u2up_net_ring_addr {
 	uint32_t addr;
-	u2upNetNodeStruct *node;
+	u2upNodeOwnCtactStruct *ownCtact;
 	u2upNetRingAddrStruct *next;
 	u2upNetRingAddrStruct *prev;
 }; /*u2upNetRingAddrStruct*/

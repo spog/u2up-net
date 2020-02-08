@@ -45,10 +45,11 @@ EXTERN u2upNodeOwnCtactStruct * insertNodeOwnContact(u2upNetNodeStruct *node, un
 EXTERN u2upNodeRingContactStruct * insertNodeContact(u2upNodeOwnCtactStruct *ownCtact, unsigned int id, uint32_t addr);
 EXTERN u2upNodeRingContactStruct * deleteNodeContact(u2upNetNodeStruct *node, uint32_t addr);
 EXTERN u2upNodeRingContactStruct * deleteNodeMyself(u2upNetNodeStruct *node, uint32_t addr);
-EXTERN u2upNodeRingContactStruct * getRandomRemoteContact(u2upNetNodeStruct *node);
+EXTERN u2upNodeRingContactStruct * getRandomRemoteContact(u2upNodeOwnCtactStruct *ownCtact);
 EXTERN u2upNodeRingContactStruct * findNearNextContact(u2upNetNodeStruct *node, uint32_t addr);
 EXTERN u2upNodeRingContactStruct * findNearPrevContact(u2upNetNodeStruct *node, uint32_t addr);
 EXTERN u2upNodeRingContactStruct * insertNearAddrContact(u2upNodeOwnCtactStruct *ownCtact, unsigned int id, uint32_t addr);
+EXTERN int getNumAllCtacts(u2upNetNodeStruct *node);
 
 EXTERN u2upNetRingAddrStruct * newU2upNetAddr(uint32_t addr);
 EXTERN u2upNetRingAddrStruct * insertNewNetAddr(u2upNetRingHeadStruct *ring, uint32_t addr);
