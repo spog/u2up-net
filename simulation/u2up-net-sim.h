@@ -66,6 +66,8 @@ struct u2up_node_own_ctact {
 	u2upNodeOwnCtactStruct *next;
 	evmTimerStruct *tmrProtoRun;
 	u2upNetRingAddrStruct *ringAddr;
+	unsigned long sentMsgs;
+	unsigned long recvdMsgs;
 }; /*u2upNodeOwnCtactStruct*/
 
 struct u2up_net_ring_addr {

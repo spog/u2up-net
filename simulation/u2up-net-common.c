@@ -79,6 +79,8 @@ u2upNodeOwnCtactStruct * newU2upNodeOwnContact(u2upNetNodeStruct *node, unsigned
 	new->numCtacts = 0; /*number of per-own-address maintained remote contacts*/
 	new->ownNode = node; /*link to our own node structure*/
 	new->myself->own = 1; /*indicates that this contact represents our own node*/
+	new->sentMsgs = 0;
+	new->recvdMsgs = 0;
 
 	return new;
 }

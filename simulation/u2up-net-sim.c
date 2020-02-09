@@ -270,6 +270,7 @@ static int evProtocolInitMsg(evmConsumerStruct *consumer, evmMessageStruct *msg)
 
 	if (send_protocol_near_req_msg(consumer, req_ownCtact, ownCtact->myself->id, ownCtact->myself->addr) != 0)
 		return -1;
+	ownCtact->sentMsgs++;
 
 	return 0;
 }
@@ -301,10 +302,12 @@ static int handleTmrProtoRun(evmConsumerStruct *consumer, evmTimerStruct *tmr)
 			req_node = &nodes[tmp->id];
 			if (ownCtact->numCtacts < node->maxCtacts) {
 				send_protocol_random_req_msg(consumer, req_node->ctacts, node->ctacts->myself->id, node->ctacts->myself->addr);
+				ownCtact->sentMsgs++;
 				evm_log_info("(node: %u@%.8u) RANDOM REQUEST sent to: %u@%.8u\n",
 						node->ctacts->myself->id, node->ctacts->myself->addr, req_node->ctacts->myself->id, req_node->ctacts->myself->addr);
 			} else {
 				send_protocol_near_req_msg(consumer, req_node->ctacts, node->ctacts->myself->id, node->ctacts->myself->addr);
+				ownCtact->sentMsgs++;
 				evm_log_info("(node: %u@%.8u) NEAR REQUEST sent to: %u@%.8u\n",
 						node->ctacts->myself->id, node->ctacts->myself->addr, req_node->ctacts->myself->id, req_node->ctacts->myself->addr);
 			}
@@ -330,6 +333,7 @@ static int evProtocolRandomReqMsg(evmConsumerStruct *consumer, evmMessageStruct 
 
 	if ((ownCtact = (u2upNodeOwnCtactStruct *)evm_message_ctx_get(msg)) == NULL)
 		return -1;
+	ownCtact->recvdMsgs++;
 
 	if ((node = ownCtact->ownNode) == NULL)
 		return -1;
@@ -349,8 +353,10 @@ static int evProtocolRandomReqMsg(evmConsumerStruct *consumer, evmMessageStruct 
 	if ((repl_ownCtact = getOwnCtact(contact->id, contact->addr)) == NULL)
 		return -1;
 
-	if ((random_contact = getRandomRemoteContact(ownCtact)) != NULL)
+	if ((random_contact = getRandomRemoteContact(ownCtact)) != NULL) {
 		send_protocol_random_repl_msg(consumer, repl_ownCtact, random_contact->id, random_contact->addr);
+		ownCtact->sentMsgs++;
+	}
 
 	return 0;
 }
@@ -366,6 +372,7 @@ static int evProtocolRandomReplMsg(evmConsumerStruct *consumer, evmMessageStruct
 
 	if ((ownCtact = (u2upNodeOwnCtactStruct *)evm_message_ctx_get(msg)) == NULL)
 		return -1;
+	ownCtact->recvdMsgs++;
 
 	if ((contact = (u2upNodeRingContactStruct *)evm_message_data_get(msg)) == NULL)
 		return -1;
@@ -395,6 +402,7 @@ static int evProtocolNearReqMsg(evmConsumerStruct *consumer, evmMessageStruct *m
 
 	if ((ownCtact = (u2upNodeOwnCtactStruct *)evm_message_ctx_get(msg)) == NULL)
 		return -1;
+	ownCtact->recvdMsgs++;
 
 	if ((node = ownCtact->ownNode) == NULL)
 		return -1;
@@ -414,11 +422,14 @@ static int evProtocolNearReqMsg(evmConsumerStruct *consumer, evmMessageStruct *m
 	if ((repl_ownCtact = getOwnCtact(contact->id, contact->addr)) == NULL)
 		return -1;
 
-	if ((near_contact = findNearNextContact(node, contact->addr)) != NULL)
+	if ((near_contact = findNearNextContact(node, contact->addr)) != NULL) {
 		send_protocol_near_repl_msg(consumer, repl_ownCtact, near_contact->id, near_contact->addr);
-
-	if ((near_contact = findNearPrevContact(node, contact->addr)) != NULL)
+		ownCtact->sentMsgs++;
+	}
+	if ((near_contact = findNearPrevContact(node, contact->addr)) != NULL) {
 		send_protocol_near_repl_msg(consumer, repl_ownCtact, near_contact->id, near_contact->addr);
+		ownCtact->sentMsgs++;
+	}
 
 	return 0;
 }
@@ -434,6 +445,7 @@ static int evProtocolNearReplMsg(evmConsumerStruct *consumer, evmMessageStruct *
 
 	if ((ownCtact = (u2upNodeOwnCtactStruct *)evm_message_ctx_get(msg)) == NULL)
 		return -1;
+	ownCtact->recvdMsgs++;
 
 	if ((contact = (u2upNodeRingContactStruct *)evm_message_data_get(msg)) == NULL)
 		return -1;
