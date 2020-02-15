@@ -38,7 +38,7 @@
 
 #include <evm/libevm.h>
 #include "u2up-netsim.h"
-#include "u2up-net-common.h"
+#include "netsim-common.h"
 
 #if 0
 int32_t calcDistance(uint32_t from_addr, uint32_t to_addr)

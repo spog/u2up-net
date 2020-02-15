@@ -48,7 +48,7 @@
 
 #include <evm/libevm.h>
 #include "u2up-netsim.h"
-#include "u2up-net-common.h"
+#include "netsim-common.h"
 
 #include <userlog/log_module.h>
 EVMLOG_MODULE_INIT(U2UP_SIM, 2);
