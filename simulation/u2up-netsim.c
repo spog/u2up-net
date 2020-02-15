@@ -1,5 +1,5 @@
 /*
- * The u2up-net-sim network simulation program
+ * The u2up-netsim network simulation program
  *
  * This file is part of the "u2up-net" software project.
  *
@@ -29,10 +29,10 @@
  *    (network nodes and their contacts).
 */
 
-#ifndef U2UP_NET_FILE_u2up_net_sim_c
-#define U2UP_NET_FILE_u2up_net_sim_c
+#ifndef U2UP_NET_FILE_u2up_netsim_c
+#define U2UP_NET_FILE_u2up_netsim_c
 #else
-#error Preprocesor macro U2UP_NET_FILE_u2up_net_sim_c conflict!
+#error Preprocesor macro U2UP_NET_FILE_u2up_netsim_c conflict!
 #endif
 
 #define _GNU_SOURCE
@@ -47,7 +47,7 @@
 #include <time.h>
 
 #include <evm/libevm.h>
-#include "u2up-net-sim.h"
+#include "u2up-netsim.h"
 #include "u2up-net-common.h"
 
 #include <userlog/log_module.h>

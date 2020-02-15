@@ -19,7 +19,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-TARGET := u2up-net-sim
+TARGET := u2up-netsim
 _INSTDIR_ := $(_INSTALL_PREFIX_)/bin
 
 # Files to be compiled:

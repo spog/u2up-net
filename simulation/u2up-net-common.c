@@ -37,7 +37,7 @@
 #include <pthread.h>
 
 #include <evm/libevm.h>
-#include "u2up-net-sim.h"
+#include "u2up-netsim.h"
 #include "u2up-net-common.h"
 
 #if 0

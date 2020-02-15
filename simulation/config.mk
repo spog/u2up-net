@@ -22,6 +22,6 @@
 ##
 # Submakes to handle:
 ##
-SUBMAKES := u2up-net-sim.mk
+SUBMAKES := u2up-netsim.mk
 export SUBMAKES
 
