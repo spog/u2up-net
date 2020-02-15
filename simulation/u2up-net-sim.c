@@ -84,6 +84,7 @@ static int evProtocolInitMsg(evmConsumerStruct *consumer, evmMessageStruct *msg)
 static pthread_mutex_t simulation_global_mutex;
 static int simulation_evm_init(void);
 static int simulation_authority_run(void);
+unsigned int auto_dump = 0;
 unsigned int batch_nodes = 1;
 unsigned int max_nodes = 10;
 static char *default_outfile = "./u2up-net-ring";
@@ -581,6 +582,8 @@ static int handleTmrAuthBatch(evmConsumerStruct *consumer, evmTimerStruct *tmr)
 				sleep(1000);
 #endif
 		}
+		if (auto_dump == 1)
+			kill(0, SIGUSR1);
 	}
 
 	if ((tmrid_ptr = evm_tmrid_get(evm, TMR_ID_AUTH_BATCH)) == NULL)
@@ -762,6 +765,7 @@ static void usage_help(char *argv[])
 	printf("options:\n");
 	printf("\t-q, --quiet              Disable all output.\n");
 	printf("\t-v, --verbose            Enable verbose output.\n");
+	printf("\t-a, --auto-dump          Automatically dump u2up network ring on node changes.\n");
 	printf("\t-b, --batch-nodes        Number of nodes to be created in a batch (default=%u).\n", batch_nodes);
 	printf("\t-m, --max-nodes          Maximum number of all nodes to be created (default=%u).\n", max_nodes);
 	printf("\t-o, --outfile            Output [path/]filename prefix (default=%s).\n", default_outfile);
@@ -785,6 +789,7 @@ static int usage_check(int argc, char *argv[])
 		static struct option long_options[] = {
 			{"quiet", 0, 0, 'q'},
 			{"verbose", 0, 0, 'v'},
+			{"auto-dump", 0, 0, 'a'},
 			{"batch-nodes", 1, 0, 'b'},
 			{"max-nodes", 1, 0, 'm'},
 			{"outfile", 1, 0, 'o'},
@@ -801,13 +806,13 @@ static int usage_check(int argc, char *argv[])
 		};
 
 #if (EVMLOG_MODULE_TRACE != 0) && (EVMLOG_MODULE_DEBUG != 0)
-		c = getopt_long(argc, argv, "qvb:m:o:tgnsh", long_options, &option_index);
+		c = getopt_long(argc, argv, "qvab:m:o:tgnsh", long_options, &option_index);
 #elif (EVMLOG_MODULE_TRACE == 0) && (EVMLOG_MODULE_DEBUG != 0)
-		c = getopt_long(argc, argv, "qvb:m:o:gnsh", long_options, &option_index);
+		c = getopt_long(argc, argv, "qvab:m:o:gnsh", long_options, &option_index);
 #elif (EVMLOG_MODULE_TRACE != 0) && (EVMLOG_MODULE_DEBUG == 0)
-		c = getopt_long(argc, argv, "qvb:m:o:tnsh", long_options, &option_index);
+		c = getopt_long(argc, argv, "qvab:m:o:tnsh", long_options, &option_index);
 #else
-		c = getopt_long(argc, argv, "qvb:m:o:nsh", long_options, &option_index);
+		c = getopt_long(argc, argv, "qvab:m:o:nsh", long_options, &option_index);
 #endif
 		if (c == -1)
 			break;
@@ -819,6 +824,10 @@ static int usage_check(int argc, char *argv[])
 
 		case 'v':
 			evmlog_verbose = 1;
+			break;
+
+		case 'a':
+			auto_dump = 1;
 			break;
 
 		case 'b':
