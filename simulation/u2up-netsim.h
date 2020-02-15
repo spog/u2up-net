@@ -1,5 +1,5 @@
 /*
- * The u2up-net-sim network simulation program
+ * The u2up-netsim network simulation program
  *
  * This file is part of the "u2up-net" software project.
  *
@@ -20,10 +20,10 @@
  *
 */
 
-#ifndef U2UP_NET_FILE_u2up_net_sim_h
-#define U2UP_NET_FILE_u2up_net_sim_h
+#ifndef U2UP_NET_FILE_u2up_netsim_h
+#define U2UP_NET_FILE_u2up_netsim_h
 
-#ifdef U2UP_NET_FILE_u2up_net_sim_c
+#ifdef U2UP_NET_FILE_u2up_netsim_c
 /* PRIVATE usage of the PUBLIC part. */
 #	undef EXTERN
 #	define EXTERN
@@ -82,4 +82,4 @@ typedef struct u2up_net_ring_head {
 	u2upNetRingAddrStruct *first;
 } u2upNetRingHeadStruct;
 
-#endif /*U2UP_NET_FILE_u2up_net_sim_h*/
+#endif /*U2UP_NET_FILE_u2up_netsim_h*/

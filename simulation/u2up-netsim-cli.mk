@@ -19,9 +19,32 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-##
-# Submakes to handle:
-##
-SUBMAKES := u2up-netsim.mk u2up-netsim-cli.mk
-export SUBMAKES
+TARGET := u2up-netsim-cli
+_INSTDIR_ := $(_INSTALL_PREFIX_)/bin
+
+# Files to be compiled:
+SRCS := $(TARGET).c
+
+# include automatic _OBJS_ compilation and SRCSx dependencies generation
+include $(_SRCDIR_)/automk/objs.mk
+
+.PHONY: all
+all: $(_OBJDIR_)/$(TARGET)
+
+$(_OBJDIR_)/$(TARGET): $(_OBJS_)
+	$(CC) $(_OBJS_) -o $@ $(LDFLAGS) -levm -lrt -lpthread -Wl,-rpath=../lib
+
+.PHONY: clean
+clean:
+	rm -f \
+		$(_OBJDIR_)/$(TARGET) $(_OBJDIR_)/$(TARGET).o $(_OBJDIR_)/$(TARGET).d
+
+.PHONY: install
+install: $(_INSTDIR_) $(_INSTDIR_)/$(TARGET)
+
+$(_INSTDIR_):
+	install -d $@
+
+$(_INSTDIR_)/$(TARGET): $(_OBJDIR_)/$(TARGET)
+	install $(_OBJDIR_)/$(TARGET) $@
 

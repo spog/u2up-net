@@ -23,7 +23,7 @@ TARGET := u2up-netsim
 _INSTDIR_ := $(_INSTALL_PREFIX_)/bin
 
 # Files to be compiled:
-SRCS := netsim-common.c $(TARGET).c
+SRCS := netsim-common.c netsim-clisrv.c $(TARGET).c
 
 # include automatic _OBJS_ compilation and SRCSx dependencies generation
 include $(_SRCDIR_)/automk/objs.mk
@@ -36,7 +36,10 @@ $(_OBJDIR_)/$(TARGET): $(_OBJS_)
 
 .PHONY: clean
 clean:
-	rm -f $(_OBJDIR_)/$(TARGET) $(_OBJDIR_)/$(TARGET).o $(_OBJDIR_)/$(TARGET).d $(_OBJDIR_)/netsim-common.o $(_OBJDIR_)/netsim-common.d
+	rm -f \
+		$(_OBJDIR_)/$(TARGET) $(_OBJDIR_)/$(TARGET).o $(_OBJDIR_)/$(TARGET).d \
+		$(_OBJDIR_)/netsim-common.o $(_OBJDIR_)/netsim-common.d \
+		$(_OBJDIR_)/netsim-clisrv.o $(_OBJDIR_)/netsim-clisrv.d
 
 .PHONY: install
 install: $(_INSTDIR_) $(_INSTDIR_)/$(TARGET)
