@@ -1,5 +1,5 @@
 /*
- * The u2up-net common functions
+ * The u2up-netsim common functions
  *
  * This file is part of the "u2up-net" software project.
  *
@@ -20,10 +20,10 @@
  *
 */
 
-#ifndef U2UP_NET_FILE_u2up_net_common_c
-#define U2UP_NET_FILE_u2up_net_common_c
+#ifndef U2UP_NET_FILE_netsim_common_c
+#define U2UP_NET_FILE_netsim_common_c
 #else
-#error Preprocesor macro U2UP_NET_FILE_u2up_net_common_c conflict!
+#error Preprocesor macro U2UP_NET_FILE_u2up_netsim_c conflict!
 #endif
 
 #define _GNU_SOURCE

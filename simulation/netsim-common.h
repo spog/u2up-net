@@ -1,5 +1,5 @@
 /*
- * The u2up-net common functions
+ * The u2up-netsim common functions
  *
  * This file is part of the "u2up-net" software project.
  *
@@ -20,10 +20,10 @@
  *
 */
 
-#ifndef U2UP_NET_FILE_u2up_net_common_h
-#define U2UP_NET_FILE_u2up_net_common_h
+#ifndef U2UP_NET_FILE_netsim_common_h
+#define U2UP_NET_FILE_netsim_common_h
 
-#ifdef U2UP_NET_FILE_u2up_net_common_c
+#ifdef U2UP_NET_FILE_netsim_common_c
 /* PRIVATE usage of the PUBLIC part. */
 #	undef EXTERN
 #	define EXTERN
@@ -54,4 +54,4 @@ EXTERN int getNumAllCtacts(u2upNetNodeStruct *node);
 EXTERN u2upNetRingAddrStruct * newU2upNetAddr(uint32_t addr);
 EXTERN u2upNetRingAddrStruct * insertNewNetAddr(u2upNetRingHeadStruct *ring, uint32_t addr);
 
-#endif /*U2UP_NET_FILE_u2up_net_common_h*/
+#endif /*U2UP_NET_FILE_netsim_common_h*/
