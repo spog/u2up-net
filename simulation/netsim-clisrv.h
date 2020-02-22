@@ -33,4 +33,13 @@
 #	define EXTERN extern
 #endif
 
+#define U2UP_NET_TRUE (0 == 0)
+#define U2UP_NET_FALSE (0 != 0)
+
+#define CLISRV_SOCK_PATH "/tmp/u2up-netsim-cli"
+#define LISTEN_BACKLOG 50
+#define CLISRV_MAX_MSGSZ 512
+
+EXTERN int simulation_clisrv_init(evmStruct *evm);
+
 #endif /*U2UP_NET_FILE_netsim_clisrv_h*/

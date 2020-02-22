@@ -36,6 +36,24 @@
 #define U2UP_NET_TRUE (0 == 0)
 #define U2UP_NET_FALSE (0 != 0)
 
+enum evm_consumer_ids {
+	EVM_CONSUMER_AUTH = 0,
+	EVM_CONSUMER_PROTOCOL,
+	EVM_CONSUMER_CLISRV
+};
+
+enum evm_msgtype_ids {
+	EV_TYPE_UNKNOWN_MSG = 0,
+	EV_TYPE_PROTOCOL_MSG,
+	EV_TYPE_CLISRV_MSG
+};
+
+enum evm_tmr_ids {
+	TMR_ID_AUTH_BATCH = 0,
+	TMR_ID_NEAR_REQ,
+	TMR_ID_CLISRV_CMDTOUT
+};
+
 //EXTERN int32_t calcDistance(uint32_t from_addr, uint32_t to_addr);
 EXTERN uint32_t calcUDistance(uint32_t from_addr, uint32_t to_addr);
 

@@ -49,19 +49,163 @@
 #include <evm/libevm.h>
 #include "u2up-netsim.h"
 #include "netsim-common.h"
+#include "netsim-clisrv.h"
 
 #include <userlog/log_module.h>
 EVMLOG_MODULE_INIT(U2UP_SIM, 2);
 
-enum evm_consumer_ids {
-	EVM_CONSUMER_AUTH = 0,
-	EVM_CONSUMER_PROTOCOL
-};
+unsigned int log_mask;
+unsigned int evmlog_normal = 1;
+unsigned int evmlog_verbose = 0;
+unsigned int evmlog_trace = 0;
+unsigned int evmlog_debug = 0;
+unsigned int evmlog_use_syslog = 0;
+unsigned int evmlog_add_header = 1;
 
-enum evm_msgtype_ids {
-	EV_TYPE_UNKNOWN_MSG = 0,
-	EV_TYPE_PROTOCOL_MSG
-};
+unsigned int auto_dump = 0;
+unsigned int batch_nodes = 1;
+unsigned int max_nodes = 10;
+static char *default_outfile = "./u2up-net-ring";
+static char *outfile = NULL;
+static struct tm start;
+
+static void usage_help(char *argv[])
+{
+	printf("Usage:\n");
+	printf("\t%s [options]\n", argv[0]);
+	printf("options:\n");
+	printf("\t-q, --quiet              Disable all output.\n");
+	printf("\t-v, --verbose            Enable verbose output.\n");
+	printf("\t-a, --auto-dump          Automatically dump u2up network ring on node changes.\n");
+	printf("\t-b, --batch-nodes        Number of nodes to be created in a batch (default=%u).\n", batch_nodes);
+	printf("\t-m, --max-nodes          Maximum number of all nodes to be created (default=%u).\n", max_nodes);
+	printf("\t-o, --outfile            Output [path/]filename prefix (default=%s).\n", default_outfile);
+#if (EVMLOG_MODULE_TRACE != 0)
+	printf("\t-t, --trace              Enable trace output.\n");
+#endif
+#if (EVMLOG_MODULE_DEBUG != 0)
+	printf("\t-g, --debug              Enable debug output.\n");
+#endif
+	printf("\t-s, --syslog             Enable syslog output (instead of stdout, stderr).\n");
+	printf("\t-n, --no-header          No EVMLOG header added to every evm_log_... output.\n");
+	printf("\t-h, --help               Displays this text.\n");
+}
+
+static int usage_check(int argc, char *argv[])
+{
+	int c;
+
+	while (1) {
+		int option_index = 0;
+		static struct option long_options[] = {
+			{"quiet", 0, 0, 'q'},
+			{"verbose", 0, 0, 'v'},
+			{"auto-dump", 0, 0, 'a'},
+			{"batch-nodes", 1, 0, 'b'},
+			{"max-nodes", 1, 0, 'm'},
+			{"outfile", 1, 0, 'o'},
+#if (EVMLOG_MODULE_TRACE != 0)
+			{"trace", 0, 0, 't'},
+#endif
+#if (EVMLOG_MODULE_DEBUG != 0)
+			{"debug", 0, 0, 'g'},
+#endif
+			{"no-header", 0, 0, 'n'},
+			{"syslog", 0, 0, 's'},
+			{"help", 0, 0, 'h'},
+			{0, 0, 0, 0}
+		};
+
+#if (EVMLOG_MODULE_TRACE != 0) && (EVMLOG_MODULE_DEBUG != 0)
+		c = getopt_long(argc, argv, "qvab:m:o:tgnsh", long_options, &option_index);
+#elif (EVMLOG_MODULE_TRACE == 0) && (EVMLOG_MODULE_DEBUG != 0)
+		c = getopt_long(argc, argv, "qvab:m:o:gnsh", long_options, &option_index);
+#elif (EVMLOG_MODULE_TRACE != 0) && (EVMLOG_MODULE_DEBUG == 0)
+		c = getopt_long(argc, argv, "qvab:m:o:tnsh", long_options, &option_index);
+#else
+		c = getopt_long(argc, argv, "qvab:m:o:nsh", long_options, &option_index);
+#endif
+		if (c == -1)
+			break;
+
+		switch (c) {
+		case 'q':
+			evmlog_normal = 0;
+			break;
+
+		case 'v':
+			evmlog_verbose = 1;
+			break;
+
+		case 'a':
+			auto_dump = 1;
+			break;
+
+		case 'b':
+			printf("batch-nodes: optarg=%s\n", optarg);
+			batch_nodes = atoi(optarg);
+			break;
+
+		case 'm':
+			printf("max-nodes: optarg=%s\n", optarg);
+			max_nodes = atoi(optarg);
+			break;
+
+		case 'o':
+			printf("outfile: optarg=%s\n", optarg);
+			asprintf(&outfile, "%s_%.4d-%.2d-%.2d-%.2d%.2d", optarg, start.tm_year + 1900, start.tm_mon + 1, start.tm_mday, start.tm_hour, start.tm_min);
+			break;
+
+#if (EVMLOG_MODULE_TRACE != 0)
+		case 't':
+			evmlog_trace = 1;
+			break;
+#endif
+
+#if (EVMLOG_MODULE_DEBUG != 0)
+		case 'g':
+			evmlog_debug = 1;
+			break;
+#endif
+
+		case 'n':
+			evmlog_add_header = 0;
+			break;
+
+		case 's':
+			evmlog_use_syslog = 1;
+			break;
+
+		case 'h':
+			usage_help(argv);
+			exit(EXIT_SUCCESS);
+
+		case '?':
+			exit(EXIT_FAILURE);
+			break;
+
+		default:
+			printf("?? getopt returned character code 0%o ??\n", c);
+			exit(EXIT_FAILURE);
+		}
+	}
+
+	if (optind < argc) {
+		printf("non-option ARGV-elements: ");
+		while (optind < argc)
+			printf("%s ", argv[optind++]);
+		printf("\n");
+		exit(EXIT_FAILURE);
+	}
+
+	if (outfile == NULL)
+		asprintf(&outfile, "%s_%.4d-%.2d-%.2d-%.2d%.2d", default_outfile, start.tm_year + 1900, start.tm_mon + 1, start.tm_mday, start.tm_hour, start.tm_min);
+
+	printf("batch_nodes = %u\n", batch_nodes);
+	printf("max_nodes = %u\n", max_nodes);
+	printf("outfile = %s\n", outfile);
+	return 0;
+}
 
 enum evm_msg_ids {
 	EV_ID_PROTOCOL_MSG_INIT = 0,
@@ -71,12 +215,6 @@ enum evm_msg_ids {
 	EV_ID_PROTOCOL_MSG_NEAR_REPL
 };
 
-enum evm_tmr_ids {
-	TMR_ID_AUTH_BATCH = 0,
-	TMR_ID_NEAR_REQ,
-	EV_ID_HELLO_TMR_QUIT
-};
-
 static evmTimerStruct * auth_start_timer(evmTimerStruct *tmr, time_t tv_sec, long tv_nsec, void *ctx_ptr, evmTmridStruct *tmrid_ptr);
 
 static int evProtocolInitMsg(evmConsumerStruct *consumer, evmMessageStruct *msg);
@@ -84,12 +222,6 @@ static int evProtocolInitMsg(evmConsumerStruct *consumer, evmMessageStruct *msg)
 static pthread_mutex_t simulation_global_mutex;
 static int simulation_evm_init(void);
 static int simulation_authority_run(void);
-unsigned int auto_dump = 0;
-unsigned int batch_nodes = 1;
-unsigned int max_nodes = 10;
-static char *default_outfile = "./u2up-net-ring";
-static char *outfile = NULL;
-static struct tm start;
 
 /*
  * The EVM part.
@@ -720,6 +852,12 @@ static int simulation_authority_run(void)
 	tmrAuthBatch = auth_start_timer(NULL, 1, 0, NULL, tmrid_ptr);
 	evm_log_notice("AUTH_BATCH timer set: 1 s\n");
 
+	/* Initialize CLI server */
+	if (simulation_clisrv_init(evm) < 0) {
+		evm_log_error("simulation_clisrv_init() failed!\n");
+		abort();
+	}
+
 	/*
 	 * Main EVM processing (event loop)
 	 */
@@ -750,152 +888,6 @@ static int simulation_sighandler_install(int signum)
 /*
  * The MAIN part.
  */
-unsigned int log_mask;
-unsigned int evmlog_normal = 1;
-unsigned int evmlog_verbose = 0;
-unsigned int evmlog_trace = 0;
-unsigned int evmlog_debug = 0;
-unsigned int evmlog_use_syslog = 0;
-unsigned int evmlog_add_header = 1;
-
-static void usage_help(char *argv[])
-{
-	printf("Usage:\n");
-	printf("\t%s [options]\n", argv[0]);
-	printf("options:\n");
-	printf("\t-q, --quiet              Disable all output.\n");
-	printf("\t-v, --verbose            Enable verbose output.\n");
-	printf("\t-a, --auto-dump          Automatically dump u2up network ring on node changes.\n");
-	printf("\t-b, --batch-nodes        Number of nodes to be created in a batch (default=%u).\n", batch_nodes);
-	printf("\t-m, --max-nodes          Maximum number of all nodes to be created (default=%u).\n", max_nodes);
-	printf("\t-o, --outfile            Output [path/]filename prefix (default=%s).\n", default_outfile);
-#if (EVMLOG_MODULE_TRACE != 0)
-	printf("\t-t, --trace              Enable trace output.\n");
-#endif
-#if (EVMLOG_MODULE_DEBUG != 0)
-	printf("\t-g, --debug              Enable debug output.\n");
-#endif
-	printf("\t-s, --syslog             Enable syslog output (instead of stdout, stderr).\n");
-	printf("\t-n, --no-header          No EVMLOG header added to every evm_log_... output.\n");
-	printf("\t-h, --help               Displays this text.\n");
-}
-
-static int usage_check(int argc, char *argv[])
-{
-	int c;
-
-	while (1) {
-		int option_index = 0;
-		static struct option long_options[] = {
-			{"quiet", 0, 0, 'q'},
-			{"verbose", 0, 0, 'v'},
-			{"auto-dump", 0, 0, 'a'},
-			{"batch-nodes", 1, 0, 'b'},
-			{"max-nodes", 1, 0, 'm'},
-			{"outfile", 1, 0, 'o'},
-#if (EVMLOG_MODULE_TRACE != 0)
-			{"trace", 0, 0, 't'},
-#endif
-#if (EVMLOG_MODULE_DEBUG != 0)
-			{"debug", 0, 0, 'g'},
-#endif
-			{"no-header", 0, 0, 'n'},
-			{"syslog", 0, 0, 's'},
-			{"help", 0, 0, 'h'},
-			{0, 0, 0, 0}
-		};
-
-#if (EVMLOG_MODULE_TRACE != 0) && (EVMLOG_MODULE_DEBUG != 0)
-		c = getopt_long(argc, argv, "qvab:m:o:tgnsh", long_options, &option_index);
-#elif (EVMLOG_MODULE_TRACE == 0) && (EVMLOG_MODULE_DEBUG != 0)
-		c = getopt_long(argc, argv, "qvab:m:o:gnsh", long_options, &option_index);
-#elif (EVMLOG_MODULE_TRACE != 0) && (EVMLOG_MODULE_DEBUG == 0)
-		c = getopt_long(argc, argv, "qvab:m:o:tnsh", long_options, &option_index);
-#else
-		c = getopt_long(argc, argv, "qvab:m:o:nsh", long_options, &option_index);
-#endif
-		if (c == -1)
-			break;
-
-		switch (c) {
-		case 'q':
-			evmlog_normal = 0;
-			break;
-
-		case 'v':
-			evmlog_verbose = 1;
-			break;
-
-		case 'a':
-			auto_dump = 1;
-			break;
-
-		case 'b':
-			printf("batch-nodes: optarg=%s\n", optarg);
-			batch_nodes = atoi(optarg);
-			break;
-
-		case 'm':
-			printf("max-nodes: optarg=%s\n", optarg);
-			max_nodes = atoi(optarg);
-			break;
-
-		case 'o':
-			printf("outfile: optarg=%s\n", optarg);
-			asprintf(&outfile, "%s_%.4d-%.2d-%.2d-%.2d%.2d", optarg, start.tm_year + 1900, start.tm_mon + 1, start.tm_mday, start.tm_hour, start.tm_min);
-			break;
-
-#if (EVMLOG_MODULE_TRACE != 0)
-		case 't':
-			evmlog_trace = 1;
-			break;
-#endif
-
-#if (EVMLOG_MODULE_DEBUG != 0)
-		case 'g':
-			evmlog_debug = 1;
-			break;
-#endif
-
-		case 'n':
-			evmlog_add_header = 0;
-			break;
-
-		case 's':
-			evmlog_use_syslog = 1;
-			break;
-
-		case 'h':
-			usage_help(argv);
-			exit(EXIT_SUCCESS);
-
-		case '?':
-			exit(EXIT_FAILURE);
-			break;
-
-		default:
-			printf("?? getopt returned character code 0%o ??\n", c);
-			exit(EXIT_FAILURE);
-		}
-	}
-
-	if (optind < argc) {
-		printf("non-option ARGV-elements: ");
-		while (optind < argc)
-			printf("%s ", argv[optind++]);
-		printf("\n");
-		exit(EXIT_FAILURE);
-	}
-
-	if (outfile == NULL)
-		asprintf(&outfile, "%s_%.4d-%.2d-%.2d-%.2d%.2d", default_outfile, start.tm_year + 1900, start.tm_mon + 1, start.tm_mday, start.tm_hour, start.tm_min);
-
-	printf("batch_nodes = %u\n", batch_nodes);
-	printf("max_nodes = %u\n", max_nodes);
-	printf("outfile = %s\n", outfile);
-	return 0;
-}
-
 int main(int argc, char *argv[])
 {
 	time_t loctime;
