@@ -231,6 +231,7 @@ int main(int argc, char *argv[])
 		rv = -1;
 	}
 	while (U2UP_NET_TRUE) {
+		printf("netsim-cli> ");
 		/* Enter one line message string to be sent */
 		fgets(snd_buf, CLISRV_MAX_MSGSZ, stdin);
 
