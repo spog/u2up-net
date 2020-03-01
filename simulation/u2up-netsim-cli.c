@@ -214,6 +214,58 @@ int clisrvSocket_init(const char *path)
 	return conn_sd;
 }
 
+#include <unistd.h>
+#include <termios.h>
+
+static char getchr()
+{
+	char buf = 0;
+	struct termios old = {0};
+
+	if (tcgetattr(0, &old) < 0)
+		evm_log_return_system_err("tcsetattr()\n");
+	old.c_lflag &= ~ICANON;
+	old.c_lflag &= ~ECHO;
+	old.c_cc[VMIN] = 1;
+	old.c_cc[VTIME] = 0;
+	if (tcsetattr(0, TCSANOW, &old) < 0)
+		evm_log_return_system_err("tcsetattr() ICANON\n");
+	if (read(0, &buf, 1) < 0)
+		evm_log_return_system_err("read()\n");
+	old.c_lflag |= ICANON;
+	old.c_lflag |= ECHO;
+	if (tcsetattr(0, TCSADRAIN, &old) < 0)
+		evm_log_return_system_err("tcsetattr() ~ICANON\n");
+	return buf;
+}
+
+static int getherCmdLine(char *cmdline, int size)
+{
+	int i = 1;
+	char currChr = '\0', prevChr = '\0';
+	char *tmp;
+
+	if (cmdline == NULL)
+		return -1;
+#if 1
+	i = strlen(cmdline);
+#endif
+	tmp = &cmdline[i];
+	do {
+		prevChr = currChr;
+		currChr = getchr();
+		*tmp = (char)currChr;
+		tmp++;
+		i++;
+		if (currChr != '\t') {
+			printf("%c", currChr);
+			fflush(stdout);
+		}
+	} while ((i < size) && (currChr != '\n') && (currChr != '\t'));
+	*tmp = '\0';
+	return 0;
+}
+
 /*
  * The MAIN part.
  */
@@ -221,8 +273,10 @@ int main(int argc, char *argv[])
 {
 	int rv = 0;
 	int sockfd;
-	char snd_buf[CLISRV_MAX_MSGSZ];
-	char rcv_buf[CLISRV_MAX_MSGSZ];
+	char snd_buf[CLISRV_MAX_MSGSZ] = "";
+	char rcv_buf[CLISRV_MAX_MSGSZ] = "";
+	char *pre_begin, *pre_end, *remain_str;
+	
 	usage_check(argc, argv);
 
 	/* Initialize CLI server listen socket */
@@ -230,10 +284,20 @@ int main(int argc, char *argv[])
 		evm_log_error("clisrvSocket_init() failed!\n");
 		rv = -1;
 	}
+	printf("netsim-cli> ");
+	fflush(stdout);
 	while (U2UP_NET_TRUE) {
-		printf("netsim-cli> ");
+#if 0 /*orig*/
 		/* Enter one line message string to be sent */
 		fgets(snd_buf, CLISRV_MAX_MSGSZ, stdin);
+#else
+		/* Gether-together a cmd-line */
+		if (getherCmdLine(snd_buf, CLISRV_MAX_MSGSZ) < 0) {
+			evm_log_error("getherCmdLine()\n");
+			close(sockfd);
+			break;
+		}
+#endif
 
 		/* Send data over the connection socket (including terminating null byte) */
 		rv = send(sockfd, snd_buf, strlen(snd_buf) + 1, 0);
@@ -246,14 +310,50 @@ int main(int argc, char *argv[])
 
 		/* Receive data from the connection socket (including terminating null byte) */
 		rv = recv(sockfd, rcv_buf, sizeof(rcv_buf), 0);
-		if (rv != strlen(snd_buf) + 1) {
+//!!!!!		if (rv != strlen(snd_buf) + 1) {
+		if (rv <= 0) {
 			evm_log_system_error("recv()\n");
 			close(sockfd);
 			break;
 		}
 		evm_log_debug("%d bytes received\n", rv);
 //not needed:	rcv_buf[rv] = '\0';
-		printf("%s", rcv_buf);
+
+		/* Process received data */
+		pre_begin = NULL;
+		pre_end = NULL;
+		if (strlen(rcv_buf) >= (strlen("<pre>") + strlen("</pre>"))) {
+			if (strncmp(rcv_buf, "<pre>", strlen("<pre>")) == 0) {
+				pre_begin = (rcv_buf + 5);
+				if ((pre_end = strstr(rcv_buf, "</pre>")) != NULL) {
+					remain_str = pre_end + 6;
+					*pre_end = '\0';
+				}
+			}
+		}
+		if ((pre_begin == NULL) && (pre_end == NULL)) {
+			remain_str = rcv_buf;
+		}
+		if (snd_buf[strlen(snd_buf) - 1] == '\t') {
+			snd_buf[strlen(snd_buf) - 1] = '\0';
+			strncat(snd_buf, remain_str, CLISRV_MAX_MSGSZ);
+		} else
+			snd_buf[0] = '\0';
+
+		if ((pre_begin != NULL) && (pre_end != NULL)) {
+			printf("%s", pre_begin);
+			/* Add additional newline, if preformated response not empty */
+			if (strlen(pre_begin) > 0)
+				printf("\n");
+		}
+
+		if ((pre_begin == NULL) && (pre_end == NULL)) {
+			printf("%s", remain_str);
+		} else {
+//			printf("\nnetsim-cli> %s", remain_str);
+			printf("netsim-cli> %s", remain_str);
+		}
+		fflush(stdout);
 	}
 
 	/* Close the connection socket */
