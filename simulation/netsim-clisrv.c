@@ -603,7 +603,7 @@ static int setCliCmdResponseByTokens(clisrv_cmds_struct *pcmds, clisrv_pconn_str
 	for (i = 0; i < pcmds->nr_cmds; i++) {
 		strval = pcmd->tokens->strval;
 		printf("%s\n", strval);
-		printf("Comparing: strval=%s, token=%s\n", strval, token);
+		printf("Comparing: mode=%d, strval=%s, token=%s\n", mode, strval, token);
 		if (strlen(strval) >= strlen(token)) {
 			if (strncmp(strval, token, strlen(token)) == 0) {
 				printf("partially compared: strval=%s, token=%s\n", strval, token);
@@ -616,6 +616,11 @@ static int setCliCmdResponseByTokens(clisrv_cmds_struct *pcmds, clisrv_pconn_str
 					buff[strlen(buff) - 1] = '\0';
 				printf("buff-3: '%s'\n", buff);
 #endif
+				if (mode == CLISRV_AUTO_SUGGEST) {
+					strncat(buff, "\n", size);
+					strncat(buff, pconn->msg, size);
+				}
+
 				strncat (buff, &strval[strlen(token)], size);
 				printf("buff-4: '%s'\n", buff);
 				strncat (buff, " ", size);
@@ -668,11 +673,15 @@ static int autoCmdLine(clisrv_pconn_struct *pconn, int mode)
 	switch (mode) {
 	case CLISRV_AUTO_COMPLETE:
 		if (rv == 1) {
+			printf("Auto-Complete-send(len=%ld):'%s'\n", strlen(buff), buff);
 			if ((rv = send(pconn->fd, buff, (strlen(buff) + 1), 0)) < 0) {
 				evm_log_system_error("send()\n");
 			}
 		} else {
-			if ((rv = send(pconn->fd, pconn->msg, (pconn->msgsz + 1), 0)) < 0) {
+			/* If AUTO-COMPLETE returns more matches, send back only '\t'! */
+			printf("Auto-Complete(pconn->msgsz=%d):'%s'\n", pconn->msgsz, pconn->msg);
+			printf("Auto-Complete-send(len=1):'\t'\n");
+			if ((rv = send(pconn->fd, "\t", 2, 0)) < 0) {
 				evm_log_system_error("send()\n");
 			}
 		}
@@ -681,6 +690,7 @@ static int autoCmdLine(clisrv_pconn_struct *pconn, int mode)
 		{
 			strncat (buff, "</pre>", 1024);
 			strncat (buff, pconn->msg, 1024);
+			printf("Auto-Suggest(len=%ld, pconn->msgsz=%d):'%s'\n", strlen(buff), pconn->msgsz, buff);
 			/* Echo the data back to the client */
 			if ((rv = send(pconn->fd, buff, (strlen(buff) + 1), 0)) < 0) {
 				evm_log_system_error("send()\n");
@@ -747,52 +757,70 @@ static int parseCmdLine(clisrv_pconn_struct *pconn)
 
 	printf("pconn->msgsz=%d'\n", pconn->msgsz);
 	printf("pconn->msg='%s'\n", pconn->msg);
-	if (pconn->msg[pconn->msgsz - 1] == '\t') {
-		/* Auto-complete the cmdline */
-		if ((rv = autoCmdLine(pconn, CLISRV_AUTO_COMPLETE)) < 0) {
-			evm_log_error("Failed to auto-complete cmdline!\n");
-		}
-		return rv;
-	}
-
-	if (
-		(pconn->msg[pconn->msgsz - 1] == '\t') &&
-		(pconn->msg[pconn->msgsz - 2] == '\t') 
-	) {
-		/* Auto-suggest the cmdline */
-		if ((rv = autoCmdLine(pconn, CLISRV_AUTO_SUGGEST)) < 0) {
-			evm_log_error("Failed to auto-suggest cmdline!\n");
-		}
-		return rv;
-	}
-
-	if (pconn->msg[pconn->msgsz - 1] == '\n') {
+	if (pconn->msgsz > 0) {
 #if 0
-		/* Echo the data back to the client */
-		if ((rv = send(pconn->fd, pconn->msg, (pconn->msgsz + 1), 0)) < 0) {
-			evm_log_system_error("send()\n");
+		if (
+			(pconn->msg[pconn->msgsz - 1] == '\t') &&
+			(pconn->msg[pconn->msgsz - 2] == '\t') 
+		) {
+			/* Auto-suggest the cmdline */
+			if ((rv = autoCmdLine(pconn, CLISRV_AUTO_SUGGEST)) < 0) {
+				evm_log_error("Failed to auto-suggest cmdline!\n");
+			}
+			return rv;
 		}
+#endif
+
+		if (pconn->msg[pconn->msgsz - 1] == '\t') {
+			if (pconn->msgsz > 1) {
+				if (pconn->msg[pconn->msgsz - 2] == '\t') {
+					pconn->msg[pconn->msgsz - 2] = '\0';
+					pconn->msgsz -= 2;
+					/* Auto-suggest the cmdline */
+					if ((rv = autoCmdLine(pconn, CLISRV_AUTO_SUGGEST)) < 0) {
+						evm_log_error("Failed to auto-suggest cmdline!\n");
+					}
+					return rv;
+				}
+			}
+			/* Auto-complete the cmdline */
+			if ((rv = autoCmdLine(pconn, CLISRV_AUTO_COMPLETE)) < 0) {
+				evm_log_error("Failed to auto-complete cmdline!\n");
+			}
+			return rv;
+		}
+
+		if (pconn->msg[pconn->msgsz - 1] == '\n') {
+#if 0
+			/* Echo the data back to the client */
+			if ((rv = send(pconn->fd, pconn->msg, (pconn->msgsz + 1), 0)) < 0) {
+				evm_log_system_error("send()\n");
+			}
 #else
 #if 1
-		if (pconn->msg[strlen(pconn->msg) - 1] == '\n') {
-			pconn->msg[strlen(pconn->msg) - 1] = '\0';
-			if (pconn->msgsz > 0)
-				pconn->msgsz--;
-		}
+//			if (pconn->msg[strlen(pconn->msg) - 1] == '\n') {
+//				pconn->msg[strlen(pconn->msg) - 1] = '\0';
+			pconn->msg[pconn->msgsz - 1] = '\0';
+			pconn->msgsz--;
+//			}
 #endif
-		/* Execute the cmdline */
-		if ((rv = execCmdLine(pconn)) < 0) {
-			evm_log_error("Failed to execute the cmdline!\n");
-		}
+			/* Execute the cmdline */
+			if ((rv = execCmdLine(pconn)) < 0) {
+				evm_log_error("Failed to execute the cmdline!\n");
+			}
 #if 0 /*maybe not necessary*/
-		/* Clear current message - pconn->tokens get reallocated -> no need to free */
-		pconn->msg[0] = '\0';
-		pconn->msgsz = 0;
+			/* Clear current message - pconn->tokens get reallocated -> no need to free */
+			pconn->msg[0] = '\0';
+			pconn->msgsz = 0;
 #endif
 #endif
-		return rv;
+			return rv;
+		} else {
+			/*message incomplete*/
+			rv = 0;
+		}
 	} else {
-		/*message incomplete*/
+		/*message empty*/
 		rv = 0;
 	}
 
@@ -975,7 +1003,7 @@ void * clisrv_ppoll_loop(void *arg)
 					/* Data was received */
 					len = rv;
 					evm_log_debug("  %d bytes received\n", len);
-					printf("received msg: '%s'\n", buffer);
+					printf("received msg(len=%ld): '%s'\n", strlen(buffer), buffer);
 
 /*TODO - Parse the received data, take action an reply! */
 #if 0 /*orig*/

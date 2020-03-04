@@ -310,7 +310,6 @@ int main(int argc, char *argv[])
 
 		/* Receive data from the connection socket (including terminating null byte) */
 		rv = recv(sockfd, rcv_buf, sizeof(rcv_buf), 0);
-//!!!!!		if (rv != strlen(snd_buf) + 1) {
 		if (rv <= 0) {
 			evm_log_system_error("recv()\n");
 			close(sockfd);
@@ -322,6 +321,7 @@ int main(int argc, char *argv[])
 		/* Process received data */
 		pre_begin = NULL;
 		pre_end = NULL;
+		remain_str = rcv_buf;
 		if (strlen(rcv_buf) >= (strlen("<pre>") + strlen("</pre>"))) {
 			if (strncmp(rcv_buf, "<pre>", strlen("<pre>")) == 0) {
 				pre_begin = (rcv_buf + 5);
@@ -331,26 +331,33 @@ int main(int argc, char *argv[])
 				}
 			}
 		}
-		if ((pre_begin == NULL) && (pre_end == NULL)) {
-			remain_str = rcv_buf;
-		}
-		if (snd_buf[strlen(snd_buf) - 1] == '\t') {
+
+		/* Clear all potential TABS at the end of the sending buffer */
+		while ((strlen(snd_buf) > 0) && (snd_buf[strlen(snd_buf) - 1] == '\t'))
 			snd_buf[strlen(snd_buf) - 1] = '\0';
-			strncat(snd_buf, remain_str, CLISRV_MAX_MSGSZ);
-		} else
-			snd_buf[0] = '\0';
 
 		if ((pre_begin != NULL) && (pre_end != NULL)) {
+			snd_buf[0] = '\0';
 			printf("%s", pre_begin);
+//			printf("%ld", strlen(pre_begin));
 			/* Add additional newline, if preformated response not empty */
-			if (strlen(pre_begin) > 0)
+			if (strlen(pre_begin) > 0) {
 				printf("\n");
+			} else {
+				if (strlen(remain_str) > 0)
+					printf("\n");
+			}
 		}
+		strncat(snd_buf, remain_str, CLISRV_MAX_MSGSZ);
 
+		if (strlen(remain_str) > 0) {
+			if (remain_str[strlen(remain_str) - 1] == '\t') {
+				remain_str[strlen(remain_str) - 1] = '\0';
+			}
+		}
 		if ((pre_begin == NULL) && (pre_end == NULL)) {
 			printf("%s", remain_str);
 		} else {
-//			printf("\nnetsim-cli> %s", remain_str);
 			printf("netsim-cli> %s", remain_str);
 		}
 		fflush(stdout);
