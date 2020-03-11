@@ -131,9 +131,14 @@ typedef struct clisrv_cmds {
 static clisrv_cmds_struct *clisrv_pcmds;
 static char *clisrv_cmds[] = {
 	"help",
-	"dump",
-	"disable addr",
+	"dump [prefix=%s]",
+	"disable addr=%.8x",
 	"enable {all | addr=%.8x | id=%u}",
+#if 1 /*test*/
+	"test1 {a b c}",
+	"test2 {a} {b} {c}",
+	"test3 {a=%d b} {c}",
+#endif
 	NULL
 };
 
@@ -578,9 +583,175 @@ static int tokenizeCmdLine(clisrv_pconn_struct *pconn)
 	return 0;
 }
 
-static int setCliCmdResponseByTokens(clisrv_cmds_struct *pcmds, clisrv_pconn_struct *pconn, char *buff, int size, int mode)
+static int setCliCmdResponseByToken(clisrv_token_struct *pcmd_tokens, clisrv_pconn_struct *pconn, char *token, char *buff, int size, int mode)
 {
 	int i;
+	int rv = 0;
+	int braces = 0;
+	int cmd_found = 0;
+	int cmd_part_found = 0;
+	char *strval;
+	clisrv_token_struct *pcmd_token;
+	evm_log_info("(entry)\n");
+
+	if (pcmd_tokens == NULL) {
+		evm_log_error("Invalid argument pcmd_tokens=%p\n", pcmd_tokens);
+		return -1;
+	}
+
+	if (pconn == NULL) {
+		evm_log_error("Invalid argument pconn=%p\n", pconn);
+		return -1;
+	}
+
+	if (token == NULL) {
+		evm_log_error("Invalid argument token=%p\n", token);
+		return -1;
+	}
+
+	printf("TEST: setCliCmdResponseByToken()\n");
+	pcmd_token = pcmd_tokens->next;
+	while (pcmd_token != NULL) {
+		braces = 0;
+		if (
+			(pcmd_token->type != CLISRV_CMD) &&
+			(pcmd_token->type != CLISRV_ARG)
+		   ) {
+			pcmd_token = pcmd_token->next;
+			continue;
+		}
+		strval = pcmd_token->strval;
+		printf("%s\n", strval);
+		printf("Comparing-opts: mode=%d, strval=%s, token=%s\n", mode, strval, token);
+		/* Force multi-match, if token empty! */
+		if (strlen(token) == 0)
+			cmd_part_found++;
+		if (strlen(strval) >= strlen(token)) {
+			if (strncmp(strval, token, strlen(token)) == 0) {
+				printf("opts - partially compared: strval=%s, token=%s\n", strval, token);
+				cmd_part_found++;
+				printf("opts - buff-1: '%s'\n", buff);
+
+#if 1
+				if (strlen(strval) == strlen(token)) {
+					cmd_part_found = 1;
+					break;
+				}
+#endif
+
+				if (mode == CLISRV_AUTO_COMPLETE) {
+					if (cmd_part_found == 1) {
+						strncat (buff, &strval[strlen(token)], size);
+						if (pcmd_token->next->type == CLISRV_EQUALS)
+							strncat(buff, "=", size);
+					} else {
+						int j = 0;
+						do {
+							if (buff[j] != strval[strlen(token) + j]) {
+								buff[j] = '\0';
+								break;
+							}
+							j++;
+						} while (j < strlen(buff));
+					}
+				}
+				if (mode == CLISRV_AUTO_SUGGEST) {
+					if (braces == 0)
+						strncat(buff, "\n", size);
+					printf("buff-2: '%s'\n", buff);
+					if (
+						(pcmd_token->base->type != CLISRV_CMD) &&
+						(pcmd_token->base->type != CLISRV_ARG)
+					) {
+						switch (pcmd_token->base->type) {
+						case CLISRV_SQUARE_L:
+						case CLISRV_CURLY_L:
+							braces++;
+							pcmd_token = pcmd_token->base;
+							break;
+						default:
+							pcmd_token = pcmd_token->next;
+						};
+						while ((braces > 0) && (pcmd_token != NULL)) {
+							if (
+								(pcmd_token->type != CLISRV_CMD) &&
+								(pcmd_token->type != CLISRV_ARG) &&
+								(pcmd_token->type != CLISRV_VAL)
+							) {
+								switch (pcmd_token->type) {
+								case CLISRV_SQUARE_L:
+									braces++;
+//									strncat(buff, "[", size);
+									if ((strlen(buff) > 0) && (buff[strlen(buff) - 1] != '\n'))
+										strncat(buff, " [", size);
+									else
+										strncat(buff, "[", size);
+									break;
+								case CLISRV_SQUARE_R:
+									braces--;
+									strncat(buff, "]", size);
+									break;
+								case CLISRV_CURLY_L:
+									braces++;
+									printf("curly brace left: strlen(buff)=%ld, buff='%s'\n", strlen(buff), buff);
+									if ((strlen(buff) > 0) && (buff[strlen(buff) - 1] != '\n'))
+										strncat(buff, " {", size);
+									else
+										strncat(buff, "{", size);
+									break;
+								case CLISRV_CURLY_R:
+									braces--;
+									strncat(buff, "}", size);
+									break;
+								case CLISRV_EQUALS:
+									strncat(buff, "=", size);
+									break;
+								case CLISRV_VERTBAR:
+									strncat(buff, " | ", size);
+									break;
+								};
+							} else
+								strncat (buff, pcmd_token->strval, size);
+
+							pcmd_token = pcmd_token->next;
+						}
+						continue;
+					} else {
+						strncat (buff, strval, size);
+						if (pcmd_token->next != NULL)
+							if (pcmd_token->next->type == CLISRV_EQUALS)
+								if (pcmd_token->next->next != NULL) {
+									strncat (buff, "=", size);
+									strncat (buff, pcmd_token->next->next->strval, size);
+								}
+					}
+
+					printf("opts - buff-4: '%s'\n", buff);
+					if (buff[strlen(buff) - 1] != '=')
+						strncat (buff, " ", size);
+					printf("opts - buff-5: '%s'\n", buff);
+				}
+			}
+		}
+		pcmd_token = pcmd_token->next;
+	}
+#if 0
+	if (cmd_found != 0) {
+		for (i = 0; i < pconn->nr_tokens; i++) {
+			printf("%s\n", token);
+
+			token += (strlen(token) + 1);
+		}
+	}
+#endif
+
+	return cmd_part_found;
+}
+
+static int setCliCmdsResponseByTokens(clisrv_cmds_struct *pcmds, clisrv_pconn_struct *pconn, char *buff, int size, int mode)
+{
+	int i;
+	int opt_part_found = 0;
 	int cmd_found = 0;
 	int cmd_part_found = 0;
 	char *token;
@@ -603,12 +774,12 @@ static int setCliCmdResponseByTokens(clisrv_cmds_struct *pcmds, clisrv_pconn_str
 	for (i = 0; i < pcmds->nr_cmds; i++) {
 		strval = pcmd->tokens->strval;
 		printf("%s\n", strval);
-		printf("Comparing: mode=%d, strval=%s, token=%s\n", mode, strval, token);
+		printf("Comparing-cmds: mode=%d, strval=%s, token=%s\n", mode, strval, token);
 		if (strlen(strval) >= strlen(token)) {
 			if (strncmp(strval, token, strlen(token)) == 0) {
-				printf("partially compared: strval=%s, token=%s\n", strval, token);
+				printf("cmds - partially compared: strval=%s, token=%s\n", strval, token);
 				cmd_part_found++;
-				printf("buff-1: '%s'\n", buff);
+				printf("cmds - buff-1: '%s'\n", buff);
 #if 0
 				strncat (buff, pconn->msg, size);
 				printf("buff-2: '%s'\n", buff);
@@ -616,36 +787,95 @@ static int setCliCmdResponseByTokens(clisrv_cmds_struct *pcmds, clisrv_pconn_str
 					buff[strlen(buff) - 1] = '\0';
 				printf("buff-3: '%s'\n", buff);
 #endif
-				if (mode == CLISRV_AUTO_SUGGEST) {
-					strncat(buff, "\n", size);
-					strncat(buff, pconn->msg, size);
-				}
 
-				strncat (buff, &strval[strlen(token)], size);
-				printf("buff-4: '%s'\n", buff);
-				strncat (buff, " ", size);
-				printf("buff-5: '%s'\n", buff);
-#if 0
 				if (strlen(strval) == strlen(token)) {
-					printf("fully compared: strval=%s, token=%s\n", strval, token);
-					cmd_found++;
-					strncat (buff, " ", size);
+					printf("buff-2: '%s'\n", buff);
+					cmd_found = 1;
 					break;
 				}
-				if (mode == CLISRV_AUTO_SUGGEST)
-					strncat (buff, "\n", size);
-#endif
+
+				if (mode == CLISRV_AUTO_COMPLETE) {
+					if (cmd_part_found == 1)
+						strncat (buff, &strval[strlen(token)], size);
+					else {
+						int j = 0;
+						do {
+							if (buff[j] != strval[strlen(token) + j]) {
+								buff[j] = '\0';
+								break;
+							}
+							j++;
+						} while (j < strlen(buff));
+					}
+				}
+				if (mode == CLISRV_AUTO_SUGGEST) {
+					strncat(buff, "\n", size);
+					strncat (buff, strval, size);
+
+					printf("cmds - buff-4: '%s'\n", buff);
+					strncat (buff, " ", size);
+					printf("cmds - buff-5: '%s'\n", buff);
+				}
 			}
 		}
 		pcmd = pcmd->next;
 	}
 	if (cmd_found != 0) {
+		printf("fully compared: strval=%s, token=%s\n", strval, token);
+
+		i = 0;
+		do {
+			i++;
+			if (mode == CLISRV_AUTO_COMPLETE) {
+				if (i >= pconn->nr_tokens)
+					break;
+			} else {
+				if (i > pconn->nr_tokens)
+					break;
+			}
+			token += (strlen(token) + 1);
+			opt_part_found = setCliCmdResponseByToken(pcmd->tokens, pconn, token, buff, size, mode);
+		} while (strncmp(strval, token, size) == 0);
+
+#if 0
 		for (i = 0; i < pconn->nr_tokens; i++) {
 			printf("%s\n", token);
-
 			token += (strlen(token) + 1);
 		}
+#endif
 	}
+
+	/* Adding additional space to auto-complete, if needed! */
+	if (mode == CLISRV_AUTO_COMPLETE) {
+		printf("checkend - pconn->msg(sz=%ld): '%c' cmd_found=%d, cmd_part_found=%d, opt_part_found=%d\n",
+				strlen(pconn->msg), pconn->msg[strlen(pconn->msg) - 2], cmd_found, cmd_part_found, opt_part_found);
+		printf("checkend - buff(len=%ld): '%c'\n", strlen(buff), buff[strlen(buff) - 1]);
+		if (
+			((cmd_part_found == 1) || (opt_part_found == 1)) &&
+			(pconn->msg[strlen(pconn->msg) - 2] != ' ') &&
+			(pconn->msg[strlen(pconn->msg) - 2] != '=') &&
+			(strlen(buff) > 0) &&
+			(buff[strlen(buff) - 1] != '=')
+		) {
+			printf("ading space\n");
+			strncat (buff, " ", size);
+		} else if (
+			((cmd_part_found == 1) && (opt_part_found == 1)) &&
+			(pconn->msg[strlen(pconn->msg) - 2] != ' ') &&
+			(pconn->msg[strlen(pconn->msg) - 2] != '=') &&
+			(strlen(buff) == 0)
+		) {
+			printf("ading space\n");
+			strncat (buff, " ", size);
+		} else if (
+			(cmd_part_found == 1) && (opt_part_found == 0)
+		) {
+			printf("ading space\n");
+			strncat (buff, " ", size);
+		}
+	}
+
+	cmd_part_found = opt_part_found;
 
 	return cmd_part_found;
 }
@@ -665,13 +895,14 @@ static int autoCmdLine(clisrv_pconn_struct *pconn, int mode)
 	if (mode == CLISRV_AUTO_SUGGEST)
 		strncat (buff, "<pre>", 1024);
 
-	if ((rv = setCliCmdResponseByTokens(clisrv_pcmds, pconn, buff, 1024, mode)) < 0) {
+	if ((rv = setCliCmdsResponseByTokens(clisrv_pcmds, pconn, buff, 1024, mode)) < 0) {
 		evm_log_error("setCliCmdResponseByToken() failed\n");
 		return -1;
 	}
 
 	switch (mode) {
 	case CLISRV_AUTO_COMPLETE:
+#if 0
 		if (rv == 1) {
 			printf("Auto-Complete-send(len=%ld):'%s'\n", strlen(buff), buff);
 			if ((rv = send(pconn->fd, buff, (strlen(buff) + 1), 0)) < 0) {
@@ -680,11 +911,21 @@ static int autoCmdLine(clisrv_pconn_struct *pconn, int mode)
 		} else {
 			/* If AUTO-COMPLETE returns more matches, send back only '\t'! */
 			printf("Auto-Complete(pconn->msgsz=%d):'%s'\n", pconn->msgsz, pconn->msg);
-			printf("Auto-Complete-send(len=1):'\t'\n");
-			if ((rv = send(pconn->fd, "\t", 2, 0)) < 0) {
+			strncat(buff, "\t", 1024);
+			printf("Auto-Complete-send(len=1):'%s'\n", buff);
+			if ((rv = send(pconn->fd, buff, (strlen(buff) + 1), 0)) < 0) {
 				evm_log_system_error("send()\n");
 			}
 		}
+#else
+		printf("Auto-Complete(buff_len=%ld):'%s'\n", strlen(buff), buff);
+		printf("Auto-Complete(pconn->msgsz=%d):'%s'\n", pconn->msgsz, pconn->msg);
+		strncat(buff, "\t", 1024);
+		printf("Auto-Complete-send(len=1):'%s'\n", buff);
+		if ((rv = send(pconn->fd, buff, (strlen(buff) + 1), 0)) < 0) {
+			evm_log_system_error("send()\n");
+		}
+#endif
 		break;
 	case CLISRV_AUTO_SUGGEST:
 		{
@@ -712,13 +953,6 @@ static int execCmdLine(clisrv_pconn_struct *pconn)
 		evm_log_error("Invalid argument pconn=%p\n", pconn);
 		return -1;
 	}
-
-#if 0
-	token = pconn->tokens;
-	for (i = 0; i < pconn->nr_tokens; i++) {
-
-	}
-#endif
 
 	strncat (buff, "<pre>", 1024);
 	strncat (buff, pconn->msg, 1024);
@@ -758,19 +992,6 @@ static int parseCmdLine(clisrv_pconn_struct *pconn)
 	printf("pconn->msgsz=%d'\n", pconn->msgsz);
 	printf("pconn->msg='%s'\n", pconn->msg);
 	if (pconn->msgsz > 0) {
-#if 0
-		if (
-			(pconn->msg[pconn->msgsz - 1] == '\t') &&
-			(pconn->msg[pconn->msgsz - 2] == '\t') 
-		) {
-			/* Auto-suggest the cmdline */
-			if ((rv = autoCmdLine(pconn, CLISRV_AUTO_SUGGEST)) < 0) {
-				evm_log_error("Failed to auto-suggest cmdline!\n");
-			}
-			return rv;
-		}
-#endif
-
 		if (pconn->msg[pconn->msgsz - 1] == '\t') {
 			if (pconn->msgsz > 1) {
 				if (pconn->msg[pconn->msgsz - 2] == '\t') {
@@ -791,29 +1012,12 @@ static int parseCmdLine(clisrv_pconn_struct *pconn)
 		}
 
 		if (pconn->msg[pconn->msgsz - 1] == '\n') {
-#if 0
-			/* Echo the data back to the client */
-			if ((rv = send(pconn->fd, pconn->msg, (pconn->msgsz + 1), 0)) < 0) {
-				evm_log_system_error("send()\n");
-			}
-#else
-#if 1
-//			if (pconn->msg[strlen(pconn->msg) - 1] == '\n') {
-//				pconn->msg[strlen(pconn->msg) - 1] = '\0';
 			pconn->msg[pconn->msgsz - 1] = '\0';
 			pconn->msgsz--;
-//			}
-#endif
 			/* Execute the cmdline */
 			if ((rv = execCmdLine(pconn)) < 0) {
 				evm_log_error("Failed to execute the cmdline!\n");
 			}
-#if 0 /*maybe not necessary*/
-			/* Clear current message - pconn->tokens get reallocated -> no need to free */
-			pconn->msg[0] = '\0';
-			pconn->msgsz = 0;
-#endif
-#endif
 			return rv;
 		} else {
 			/*message incomplete*/
@@ -847,27 +1051,6 @@ static int parseReceivedData(clisrv_pconn_struct *pconn, char *buff, int len)
 		return -1;
 	}
 
-#if 0
-#if 1
-//	printf("pconn->msg=%p, pconn->msgsz=%d, len=%d\n", pconn->msg, pconn->msgsz, len);
-	if ((tmp = (char *)reallocarray(pconn->msg, pconn->msgsz + len, sizeof(char))) == NULL) {
-		evm_log_system_error("realocarray() - msg\n");
-	}
-#else
-	printf("pconn->msg=%p, pconn->msgsz=%d, len=%d\n", pconn->msg, pconn->msgsz, len);
-	if ((tmp = (char *)calloc((pconn->msgsz + len), sizeof(char))) == NULL) {
-		evm_log_return_system_err("realocarray() - msg\n");
-	}
-	if (pconn->msg != NULL) {
-		memcpy(tmp, pconn->msg, pconn->msgsz + 1);
-		free(pconn->msg);
-	}
-#endif
-	pconn->msg = tmp;
-	tmp += pconn->msgsz;
-	memcpy(tmp, buff, len);
-	pconn->msgsz += (len - 1);
-#else
 	if ((tmp = (char *)reallocarray(pconn->msg, len, sizeof(char))) == NULL) {
 		evm_log_system_error("realocarray() - msg\n");
 		abort();
@@ -875,14 +1058,6 @@ static int parseReceivedData(clisrv_pconn_struct *pconn, char *buff, int len)
 	pconn->msg = tmp;
 	memcpy(tmp, buff, len);
 	pconn->msgsz = len - 1;
-#if 0
-	if (pconn->msg[strlen(pconn->msg) - 1] == '\n') {
-		pconn->msg[strlen(pconn->msg) - 1] = '\0';
-		if (pconn->msgsz > 0)
-			pconn->msgsz--;
-	}
-#endif
-#endif
 
 	return parseCmdLine(pconn);
 }

@@ -252,15 +252,20 @@ static int getherCmdLine(char *cmdline, int size)
 #endif
 	tmp = &cmdline[i];
 	do {
-		prevChr = currChr;
+//		prevChr = currChr;
 		currChr = getchr();
-		*tmp = (char)currChr;
-		tmp++;
-		i++;
 		if (currChr != '\t') {
+			if ((i > 0) && (*(tmp - 1) == '\t')) {
+				*tmp = '\0';
+				tmp--;
+				i--;
+			}
 			printf("%c", currChr);
 			fflush(stdout);
 		}
+		*tmp = (char)currChr;
+		tmp++;
+		i++;
 	} while ((i < size) && (currChr != '\n') && (currChr != '\t'));
 	*tmp = '\0';
 	return 0;
