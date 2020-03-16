@@ -583,13 +583,13 @@ static int tokenizeCmdLine(clisrv_pconn_struct *pconn)
 	return 0;
 }
 
-static int setCliCmdResponseByToken(clisrv_token_struct *pcmd_tokens, clisrv_pconn_struct *pconn, char *token, char *buff, int size, int mode)
+static int setCliCmdAutoSuggestByToken(clisrv_token_struct *pcmd_tokens, clisrv_pconn_struct *pconn, char *token, char *buff, int size)
 {
 	int i;
 	int rv = 0;
 	int braces = 0;
-	int cmd_found = 0;
-	int cmd_part_found = 0;
+	int opt_found = 0;
+	int opt_part_found = 0;
 	char *strval;
 	clisrv_token_struct *pcmd_token;
 	evm_log_info("(entry)\n");
@@ -609,7 +609,167 @@ static int setCliCmdResponseByToken(clisrv_token_struct *pcmd_tokens, clisrv_pco
 		return -1;
 	}
 
-	printf("TEST: setCliCmdResponseByToken()\n");
+	printf("TEST: setCliCmdAutoSuggestByToken()\n");
+	pcmd_token = pcmd_tokens->next;
+	while (pcmd_token != NULL) {
+		if (
+			(pcmd_token->type != CLISRV_CMD) &&
+			(pcmd_token->type != CLISRV_ARG)
+		   ) {
+			pcmd_token = pcmd_token->next;
+			continue;
+		}
+		strval = pcmd_token->strval;
+		printf("AutoSuggest - strval: '%s'\n", strval);
+		printf("AutoSuggest - Comparing-opts: strval=%s, token=%s\n", strval, token);
+		/* Force multi-match, if token empty! */
+		if (strlen(token) == 0)
+			opt_part_found++;
+		if (strlen(strval) >= strlen(token)) {
+			if (strncmp(strval, token, strlen(token)) == 0) {
+				printf("AutoSuggest - opts - partially compared: strval=%s, token=%s\n", strval, token);
+				opt_part_found++;
+				printf("AutoSuggest - opts - buff-1: '%s'\n", buff);
+
+				if (strlen(strval) == strlen(token)) {
+					opt_found = 1;
+				}
+
+			}
+		}
+		pcmd_token = pcmd_token->next;
+	}
+
+	if (opt_part_found > 0) {
+		pcmd_token = pcmd_tokens->next;
+		braces = 0;
+		while (pcmd_token != NULL) {
+			if (
+				(pcmd_token->type != CLISRV_CMD) &&
+				(pcmd_token->type != CLISRV_ARG)
+			   ) {
+				pcmd_token = pcmd_token->next;
+				continue;
+			}
+			strval = pcmd_token->strval;
+			printf("AutoSuggest - strval: '%s'\n", strval);
+			if (braces == 0)
+				strncat(buff, "\n", size);
+			printf("AutoSuggest - buff-2: '%s'\n", buff);
+			if (
+				(pcmd_token->base->type != CLISRV_CMD) &&
+				(pcmd_token->base->type != CLISRV_ARG)
+			) {
+				switch (pcmd_token->base->type) {
+				case CLISRV_SQUARE_L:
+				case CLISRV_CURLY_L:
+					braces++;
+					pcmd_token = pcmd_token->base;
+					break;
+				default:
+					pcmd_token = pcmd_token->next;
+				};
+				while ((braces > 0) && (pcmd_token != NULL)) {
+					if (
+						(pcmd_token->type != CLISRV_CMD) &&
+						(pcmd_token->type != CLISRV_ARG) &&
+						(pcmd_token->type != CLISRV_VAL)
+					) {
+						switch (pcmd_token->type) {
+						case CLISRV_SQUARE_L:
+							braces++;
+//							strncat(buff, "[", size);
+							if ((strlen(buff) > 0) && (buff[strlen(buff) - 1] != '\n'))
+								strncat(buff, " [", size);
+							else
+								strncat(buff, "[", size);
+							break;
+						case CLISRV_SQUARE_R:
+							braces--;
+							strncat(buff, "]", size);
+							break;
+						case CLISRV_CURLY_L:
+							braces++;
+							printf("AutoSuggest - curly brace left: strlen(buff)=%ld, buff='%s'\n", strlen(buff), buff);
+							if ((strlen(buff) > 0) && (buff[strlen(buff) - 1] != '\n'))
+								strncat(buff, " {", size);
+							else
+								strncat(buff, "{", size);
+							break;
+						case CLISRV_CURLY_R:
+							braces--;
+							strncat(buff, "}", size);
+							break;
+						case CLISRV_EQUALS:
+							strncat(buff, "=", size);
+							break;
+						case CLISRV_VERTBAR:
+							strncat(buff, " | ", size);
+							break;
+						};
+					} else
+						strncat (buff, pcmd_token->strval, size);
+
+					pcmd_token = pcmd_token->next;
+				}
+				continue;
+			} else {
+				strncat (buff, strval, size);
+				if (pcmd_token->next != NULL)
+					if (pcmd_token->next->type == CLISRV_EQUALS)
+						if (pcmd_token->next->next != NULL) {
+							strncat (buff, "=", size);
+							strncat (buff, pcmd_token->next->next->strval, size);
+						}
+			}
+
+			printf("AutoSuggest - opts - buff-4: '%s'\n", buff);
+			if (buff[strlen(buff) - 1] != '=')
+				strncat (buff, " ", size);
+			printf("AutoSuggest - opts - buff-5: '%s'\n", buff);
+			pcmd_token = pcmd_token->next;
+		}
+	}
+#if 0
+	if (opt_found != 0) {
+		for (i = 0; i < pconn->nr_tokens; i++) {
+			printf("AutoSuggest - token: '%s'\n", token);
+
+			token += (strlen(token) + 1);
+		}
+	}
+#endif
+
+	return opt_part_found;
+}
+
+static int setCliCmdAutoCompleteByToken(clisrv_token_struct *pcmd_tokens, clisrv_pconn_struct *pconn, char *token, char *buff, int size)
+{
+	int i;
+	int rv = 0;
+	int braces = 0;
+	int opt_found = 0;
+	int opt_part_found = 0;
+	char *strval;
+	clisrv_token_struct *pcmd_token;
+	evm_log_info("(entry)\n");
+
+	if (pcmd_tokens == NULL) {
+		evm_log_error("Invalid argument pcmd_tokens=%p\n", pcmd_tokens);
+		return -1;
+	}
+
+	if (pconn == NULL) {
+		evm_log_error("Invalid argument pconn=%p\n", pconn);
+		return -1;
+	}
+
+	if (token == NULL) {
+		evm_log_error("Invalid argument token=%p\n", token);
+		return -1;
+	}
+
+	printf("TEST: setCliCmdAutoCompleteByToken()\n");
 	pcmd_token = pcmd_tokens->next;
 	while (pcmd_token != NULL) {
 		braces = 0;
@@ -622,121 +782,42 @@ static int setCliCmdResponseByToken(clisrv_token_struct *pcmd_tokens, clisrv_pco
 		}
 		strval = pcmd_token->strval;
 		printf("%s\n", strval);
-		printf("Comparing-opts: mode=%d, strval=%s, token=%s\n", mode, strval, token);
+		printf("AutoComplete - Comparing-opts: strval=%s, token=%s\n", strval, token);
 		/* Force multi-match, if token empty! */
 		if (strlen(token) == 0)
-			cmd_part_found++;
+			opt_part_found++;
 		if (strlen(strval) >= strlen(token)) {
 			if (strncmp(strval, token, strlen(token)) == 0) {
-				printf("opts - partially compared: strval=%s, token=%s\n", strval, token);
-				cmd_part_found++;
-				printf("opts - buff-1: '%s'\n", buff);
+				printf("AutoComplete - opts - partially compared: strval=%s, token=%s\n", strval, token);
+				opt_part_found++;
+				printf("AutoComplete - opts - buff-1: '%s'\n", buff);
 
-#if 1
 				if (strlen(strval) == strlen(token)) {
-					cmd_part_found = 1;
-					break;
+					opt_found = 1;
 				}
-#endif
 
-				if (mode == CLISRV_AUTO_COMPLETE) {
-					if (cmd_part_found == 1) {
-						strncat (buff, &strval[strlen(token)], size);
-						if (pcmd_token->next->type == CLISRV_EQUALS)
-							strncat(buff, "=", size);
-					} else {
-						int j = 0;
-						do {
-							if (buff[j] != strval[strlen(token) + j]) {
-								buff[j] = '\0';
-								break;
-							}
-							j++;
-						} while (j < strlen(buff));
-					}
-				}
-				if (mode == CLISRV_AUTO_SUGGEST) {
-					if (braces == 0)
-						strncat(buff, "\n", size);
-					printf("buff-2: '%s'\n", buff);
-					if (
-						(pcmd_token->base->type != CLISRV_CMD) &&
-						(pcmd_token->base->type != CLISRV_ARG)
-					) {
-						switch (pcmd_token->base->type) {
-						case CLISRV_SQUARE_L:
-						case CLISRV_CURLY_L:
-							braces++;
-							pcmd_token = pcmd_token->base;
+				if (opt_part_found == 1) {
+					strncat (buff, &strval[strlen(token)], size);
+					if (pcmd_token->next->type == CLISRV_EQUALS)
+						strncat(buff, "=", size);
+					if (opt_found == 1)
+						break;
+				} else {
+					int j = 0;
+					do {
+						if (buff[j] != strval[strlen(token) + j]) {
+							buff[j] = '\0';
 							break;
-						default:
-							pcmd_token = pcmd_token->next;
-						};
-						while ((braces > 0) && (pcmd_token != NULL)) {
-							if (
-								(pcmd_token->type != CLISRV_CMD) &&
-								(pcmd_token->type != CLISRV_ARG) &&
-								(pcmd_token->type != CLISRV_VAL)
-							) {
-								switch (pcmd_token->type) {
-								case CLISRV_SQUARE_L:
-									braces++;
-//									strncat(buff, "[", size);
-									if ((strlen(buff) > 0) && (buff[strlen(buff) - 1] != '\n'))
-										strncat(buff, " [", size);
-									else
-										strncat(buff, "[", size);
-									break;
-								case CLISRV_SQUARE_R:
-									braces--;
-									strncat(buff, "]", size);
-									break;
-								case CLISRV_CURLY_L:
-									braces++;
-									printf("curly brace left: strlen(buff)=%ld, buff='%s'\n", strlen(buff), buff);
-									if ((strlen(buff) > 0) && (buff[strlen(buff) - 1] != '\n'))
-										strncat(buff, " {", size);
-									else
-										strncat(buff, "{", size);
-									break;
-								case CLISRV_CURLY_R:
-									braces--;
-									strncat(buff, "}", size);
-									break;
-								case CLISRV_EQUALS:
-									strncat(buff, "=", size);
-									break;
-								case CLISRV_VERTBAR:
-									strncat(buff, " | ", size);
-									break;
-								};
-							} else
-								strncat (buff, pcmd_token->strval, size);
-
-							pcmd_token = pcmd_token->next;
 						}
-						continue;
-					} else {
-						strncat (buff, strval, size);
-						if (pcmd_token->next != NULL)
-							if (pcmd_token->next->type == CLISRV_EQUALS)
-								if (pcmd_token->next->next != NULL) {
-									strncat (buff, "=", size);
-									strncat (buff, pcmd_token->next->next->strval, size);
-								}
-					}
-
-					printf("opts - buff-4: '%s'\n", buff);
-					if (buff[strlen(buff) - 1] != '=')
-						strncat (buff, " ", size);
-					printf("opts - buff-5: '%s'\n", buff);
+						j++;
+					} while (j < strlen(buff));
 				}
 			}
 		}
 		pcmd_token = pcmd_token->next;
 	}
 #if 0
-	if (cmd_found != 0) {
+	if (opt_found != 0) {
 		for (i = 0; i < pconn->nr_tokens; i++) {
 			printf("%s\n", token);
 
@@ -745,7 +826,7 @@ static int setCliCmdResponseByToken(clisrv_token_struct *pcmd_tokens, clisrv_pco
 	}
 #endif
 
-	return cmd_part_found;
+	return opt_part_found;
 }
 
 static int setCliCmdsResponseByTokens(clisrv_cmds_struct *pcmds, clisrv_pconn_struct *pconn, char *buff, int size, int mode)
@@ -821,28 +902,28 @@ static int setCliCmdsResponseByTokens(clisrv_cmds_struct *pcmds, clisrv_pconn_st
 		pcmd = pcmd->next;
 	}
 	if (cmd_found != 0) {
-		printf("fully compared: strval=%s, token=%s\n", strval, token);
-
-		i = 0;
-		do {
-			i++;
-			if (mode == CLISRV_AUTO_COMPLETE) {
+		printf("fully compared: strval=%s, token(nr_tokens=%d)=%s\n", strval, pconn->nr_tokens, token);
+		if (pconn->nr_tokens > 0) {
+			i = 1;
+			token += (strlen(token) + 1);
+			while (i < pconn->nr_tokens) {
+				if (mode == CLISRV_AUTO_COMPLETE) {
+					opt_part_found = setCliCmdAutoCompleteByToken(pcmd->tokens, pconn, token, buff, size);
+					printf("2 - opt_part_found=%d\n", opt_part_found);
+					if (strncmp(strval, token, size) == 0)
+						break;
+				}
+				i++;
 				if (i >= pconn->nr_tokens)
 					break;
-			} else {
-				if (i > pconn->nr_tokens)
-					break;
+				token += (strlen(token) + 1);
 			}
-			token += (strlen(token) + 1);
-			opt_part_found = setCliCmdResponseByToken(pcmd->tokens, pconn, token, buff, size, mode);
-		} while (strncmp(strval, token, size) == 0);
-
-#if 0
-		for (i = 0; i < pconn->nr_tokens; i++) {
-			printf("%s\n", token);
-			token += (strlen(token) + 1);
+			if (mode == CLISRV_AUTO_SUGGEST) {
+				opt_part_found = setCliCmdAutoSuggestByToken(pcmd->tokens, pconn, token, buff, size);
+				printf("3 - opt_part_found=%d\n", opt_part_found);
+			}
 		}
-#endif
+
 	}
 
 	/* Adding additional space to auto-complete, if needed! */
@@ -857,7 +938,7 @@ static int setCliCmdsResponseByTokens(clisrv_cmds_struct *pcmds, clisrv_pconn_st
 			(strlen(buff) > 0) &&
 			(buff[strlen(buff) - 1] != '=')
 		) {
-			printf("ading space\n");
+			printf("adding space 1\n");
 			strncat (buff, " ", size);
 		} else if (
 			((cmd_part_found == 1) && (opt_part_found == 1)) &&
@@ -865,12 +946,14 @@ static int setCliCmdsResponseByTokens(clisrv_cmds_struct *pcmds, clisrv_pconn_st
 			(pconn->msg[strlen(pconn->msg) - 2] != '=') &&
 			(strlen(buff) == 0)
 		) {
-			printf("ading space\n");
+			printf("adding space 2\n");
 			strncat (buff, " ", size);
 		} else if (
-			(cmd_part_found == 1) && (opt_part_found == 0)
+			((cmd_part_found == 1) && (opt_part_found == 0)) &&
+			(pconn->msg[strlen(pconn->msg) - 2] != ' ') &&
+			(pconn->nr_tokens == 1)
 		) {
-			printf("ading space\n");
+			printf("adding space 3\n");
 			strncat (buff, " ", size);
 		}
 	}
@@ -896,7 +979,7 @@ static int autoCmdLine(clisrv_pconn_struct *pconn, int mode)
 		strncat (buff, "<pre>", 1024);
 
 	if ((rv = setCliCmdsResponseByTokens(clisrv_pcmds, pconn, buff, 1024, mode)) < 0) {
-		evm_log_error("setCliCmdResponseByToken() failed\n");
+		evm_log_error("setCliCmdResponseByTokens() failed\n");
 		return -1;
 	}
 
