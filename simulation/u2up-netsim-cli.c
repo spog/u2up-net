@@ -32,6 +32,7 @@
 
 #define _GNU_SOURCE
 
+#include <ctype.h>
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -239,35 +240,187 @@ static char getchr()
 	return buf;
 }
 
+#define REMOVE_FROM_LINE(buf, idx, cnt) { \
+	idx -= cnt; \
+	buf[idx] = '\0'; \
+}
+
+/*
+ * !!!IMPORTANT!!!
+ * Evaluate functions do nothing, if indexed char equals '\0'!
+ */
+static int evaluate3char_sequence(char *line, int i)
+{
+	if (line[i] == '\0')
+		return i;
+
+	if (i < 2) {
+		evm_log_debug("Called with wrong index (i=%d)\n", i);
+		return i;
+	}
+
+	/* Check if 3-char CSI sequence */
+	if ((line[i - 2] == 27 /*ESC*/) && (line[i - 1] == 91 /*'['*/)) {
+		/* evaluate 'arrow keys' */
+		if (line[i] == 'A') {
+			evm_log_debug("Arrow key UP pressed\n");
+			REMOVE_FROM_LINE(line, i, 2);
+		} else if (line[i] == 'B') {
+			evm_log_debug("Arrow key DOWN pressed\n");
+			REMOVE_FROM_LINE(line, i, 2);
+		} else if (line[i] == 'C') {
+			evm_log_debug("Arrow key RIGHT pressed\n");
+			REMOVE_FROM_LINE(line, i, 2);
+		} else if (line[i] == 'D') {
+			evm_log_debug("Arrow key LEFT pressed\n");
+			REMOVE_FROM_LINE(line, i, 2);
+		} else {
+			evm_log_debug("Unknown 3 chars CSI sequence received!\n");
+			REMOVE_FROM_LINE(line, i, 2);
+		}
+	}
+	return i;
+}
+
+static int evaluate2char_sequence(char *line, int i)
+{
+	if (line[i] == '\0')
+		return i;
+
+	if (i < 1) {
+		evm_log_debug("Called with wrong index (i=%d)\n", i);
+		return i;
+	}
+
+	/* Check if 2-char sequence */
+	if (line[i - 1] == 27 /*ESC*/) {
+		if (line[i] == 91 /*'['*/) {
+			evm_log_debug("CSI sequence start detected: 'ESC-['\n");
+			i++;
+		} else {
+			/* evaluate '2-char' sequence */
+			evm_log_debug("2-char sequence: 'ESC'-%d\n", line[i]);
+			REMOVE_FROM_LINE(line, i, 1);
+		}
+	}
+	return i;
+}
+
+static int evaluate1char_sequence(char *line, int i)
+{
+	if (line[i] == '\0')
+		return i;
+
+	if (i < 0) {
+		evm_log_debug("Error - abort: Called with negative line position index (i=%d)\n", i);
+		return i;
+	}
+
+	if (line[i] != '\t') {
+		/* Extra TAB-[TAB] handling */
+		if ((i > 0) && (line[i - 1] == '\t')) {
+			line[i - 1] = line[i];
+			line[i] = '\0';
+			i--;
+			evm_log_debug("Removed previous TAB input (i=%d)\n", i);
+		}
+	}
+	if (isprint(line[i])) {
+		/* Printable single character input */
+		evm_log_debug("Printable character input\n");
+		evm_log_debug("Key '%c' pressed\n", line[i]);
+		printf("%c", line[i]);
+		fflush(stdout);
+		i++;
+	} else {
+		/* Non-printable single character input */
+		evm_log_debug("Non-printable character input\n");
+		if (line[i] == '\t') {
+			evm_log_debug("Key TAB pressed\n");
+			i++;
+		} else
+		if (line[i] == '\n') {
+			evm_log_debug("Key ENTER pressed\n");
+			printf("%c", line[i]);
+			fflush(stdout);
+			i++;
+		} else
+		if (line[i] == 127) {
+			evm_log_debug("Key BACKSPACE pressed\n");
+			line[i] = '\0';
+			if (i > 0) {
+				i--;
+				line[i] = '\0';
+				printf("\b \b");
+				fflush(stdout);
+			}
+		} else
+		if (line[i] == 27 /*ESC*/) {
+			evm_log_debug("Key ESCAPE pressed\n");
+			i++;
+		} else {
+			evm_log_debug("Unexpected Key (%d) pressed\n", line[i]);
+		}
+	}
+
+	return i;
+}
+
 static int getherCmdLine(char *cmdline, int size)
 {
-	int i = 1;
-	char currChr = '\0', prevChr = '\0';
-	char *tmp;
+	int i;
+	char *line;
 
 	if (cmdline == NULL)
 		return -1;
-#if 1
+
 	i = strlen(cmdline);
-#endif
-	tmp = &cmdline[i];
+
+	line = cmdline;
+#if 1
 	do {
-//		prevChr = currChr;
-		currChr = getchr();
-		if (currChr != '\t') {
-			if ((i > 0) && (*(tmp - 1) == '\t')) {
-				*tmp = '\0';
-				tmp--;
-				i--;
-			}
-			printf("%c", currChr);
-			fflush(stdout);
+		line[i] = getchr();
+		evm_log_debug("line[%d]=%d\n", i, line[i]);
+		if ((i + 1)  < size)
+			line[i + 1] = '\0';
+		else {
+			evm_log_debug("Error - abort: Line too long (i=%d)\n", i);
+			abort();
 		}
-		*tmp = (char)currChr;
-		tmp++;
-		i++;
-	} while ((i < size) && (currChr != '\n') && (currChr != '\t'));
-	*tmp = '\0';
+
+		/*
+		 * Evaluate input sequences and chars
+		 */
+		/* Start with longest CSI sequences (3-chars) */
+		if (i >= 2) {
+			evm_log_debug("(i >= 2) i=%d\n", i);
+			i = evaluate3char_sequence(line, i);
+			if (i >= 1) {
+				i = evaluate2char_sequence(line, i);
+				if (i >= 0) {
+					i = evaluate1char_sequence(line, i);
+				}
+			}
+		} else if (i >= 1) {
+			evm_log_debug("(i >= 1) i=%d\n", i);
+			i = evaluate2char_sequence(line, i);
+			if (i >= 0) {
+				i = evaluate1char_sequence(line, i);
+			}
+		} else if (i >= 0) {
+			evm_log_debug("(i >= 0) i=%d\n", i);
+			i = evaluate1char_sequence(line, i);
+		} else {
+			evm_log_debug("Error - abort: negative line position index i=%d\n", i);
+			abort();
+		}
+
+		if ((line[i - 1] == '\t') || (line[i - 1] == '\n'))
+			break;
+
+	} while (i < size);
+#endif
+
 	return 0;
 }
 
