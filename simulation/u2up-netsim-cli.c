@@ -249,8 +249,11 @@ static char getchr()
  * !!!IMPORTANT!!!
  * Evaluate functions do nothing, if indexed char equals '\0'!
  */
-static int evaluate3char_sequence(char *const line, int i, char *const rline, int *const rip)
+static int evaluate4char_sequence(char *const line, int i, char *const rline, int *const rip)
 {
+	int j;
+	evm_log_info("(entry) i=%d\n", i);
+
 	if (line[i] == '\0')
 		return i;
 
@@ -259,17 +262,57 @@ static int evaluate3char_sequence(char *const line, int i, char *const rline, in
 		return i;
 	}
 
-	/* Check if 3-char CSI sequence */
+	/* Check if 4-char ESC sequence */
+	if (
+		(line[i - 3] == 27 /*ESC*/) &&
+		(line[i - 2] == 91 /*'['*/) &&
+		(line[i - 1] == 51 /*'3'*/)
+	) {
+		if (line[i] == 126 /*'~'*/) {
+			/* evaluate 'DEL' key */
+			evm_log_debug("Key DEL pressed\n");
+			REMOVE_FROM_LINE(line, i, 3);
+			if (rline[*rip] != '\0') {
+				(*rip)++;
+				printf("%s", &rline[*rip]);
+				printf(" \b");
+				for (j = 0; j < strlen(&rline[*rip]); j++)
+					printf("\b");
+				fflush(stdout);
+			}
+		} else {
+			evm_log_debug("Unknown 4-char ESC sequence received!\n");
+			REMOVE_FROM_LINE(line, i, 3);
+		}
+	}
+	return i;
+}
+
+static int evaluate3char_sequence(char *const line, int i, char *const rline, int *const rip)
+{
+	evm_log_info("(entry) i=%d\n", i);
+
+	if (line[i] == '\0')
+		return i;
+
+	if (i < 2) {
+		evm_log_debug("Called with wrong index (i=%d)\n", i);
+		return i;
+	}
+
+	/* Check if 3-char ESC sequence */
 	if ((line[i - 2] == 27 /*ESC*/) && (line[i - 1] == 91 /*'['*/)) {
 		/* evaluate 'arrow keys' */
-		if (line[i] == 'A') {
-			evm_log_debug("Arrow key UP pressed\n");
+		if (line[i] == 65 /*'A'*/) {
+			evm_log_debug("Key UP pressed\n");
 			REMOVE_FROM_LINE(line, i, 2);
-		} else if (line[i] == 'B') {
-			evm_log_debug("Arrow key DOWN pressed\n");
+		} else
+		if (line[i] == 66 /*'B'*/) {
+			evm_log_debug("Key DOWN pressed\n");
 			REMOVE_FROM_LINE(line, i, 2);
-		} else if (line[i] == 'C') {
-			evm_log_debug("Arrow key RIGHT pressed\n");
+		} else
+		if (line[i] == 67 /*'C'*/) {
+			evm_log_debug("Key RIGHT pressed\n");
 			REMOVE_FROM_LINE(line, i, 2);
 			if ((i < (CLISRV_MAX_CMDSZ - 1)) && (rline[*rip] != '\0')) {
 				line[i] = rline[*rip];
@@ -279,8 +322,9 @@ static int evaluate3char_sequence(char *const line, int i, char *const rline, in
 				(*rip)++;
 				line[i] = '\0';
 			}
-		} else if (line[i] == 'D') {
-			evm_log_debug("Arrow key LEFT pressed\n");
+		} else
+		if (line[i] == 68 /*'D'*/) {
+			evm_log_debug("Key LEFT pressed\n");
 			REMOVE_FROM_LINE(line, i, 2);
 			if ((i > 0) && (*rip > 0)) {
 				i--;
@@ -290,8 +334,36 @@ static int evaluate3char_sequence(char *const line, int i, char *const rline, in
 				printf("\b");
 				fflush(stdout);
 			}
+		} else
+		if (line[i] == 70 /*End*/) {
+			evm_log_debug("Key END pressed\n");
+			REMOVE_FROM_LINE(line, i, 2);
+			while ((i < (CLISRV_MAX_CMDSZ - 1)) && (rline[*rip] != '\0')) {
+				line[i] = rline[*rip];
+				printf("%c", line[i]);
+				fflush(stdout);
+				i++;
+				(*rip)++;
+				line[i] = '\0';
+			}
+		} else
+		if (line[i] == 72 /*Home*/) {
+			evm_log_debug("Key HOME pressed\n");
+			REMOVE_FROM_LINE(line, i, 2);
+			while ((i > 0) && (*rip > 0)) {
+				i--;
+				(*rip)--;
+				rline[*rip] = line[i];
+				line[i] = '\0';
+				printf("\b");
+				fflush(stdout);
+			}
+		} else
+		if (line[i] == 51 /*'3'*/) {
+			evm_log_debug("Potential 4-char ESC sequence\n");
+			i++;
 		} else {
-			evm_log_debug("Unknown 3 chars CSI sequence received!\n");
+			evm_log_debug("Unknown 3 chars ESC sequence received!\n");
 			REMOVE_FROM_LINE(line, i, 2);
 		}
 	}
@@ -300,6 +372,8 @@ static int evaluate3char_sequence(char *const line, int i, char *const rline, in
 
 static int evaluate2char_sequence(char *const line, int i, char *const rline, int *const rip)
 {
+	evm_log_info("(entry) i=%d\n", i);
+
 	if (line[i] == '\0')
 		return i;
 
@@ -308,14 +382,28 @@ static int evaluate2char_sequence(char *const line, int i, char *const rline, in
 		return i;
 	}
 
-	/* Check if 2-char sequence */
+#if 0
+	if ((i >= 2) && (line[i - 2] == 27 /*ESC*/)) {
+		evm_log_debug("Potentially 4-char ESC sequence\n");
+		i++;
+		return i;
+	}
+
+	if ((i >= 1) && (line[i - 1] == 27 /*ESC*/)) {
+		evm_log_debug("Potentially 3-char ESC sequence\n");
+		i++;
+		return i;
+	}
+#endif
+
+	/* Check if 2-char ESC sequence */
 	if (line[i - 1] == 27 /*ESC*/) {
 		if (line[i] == 91 /*'['*/) {
-			evm_log_debug("CSI sequence start detected: 'ESC-['\n");
+			evm_log_debug("Proper ESC sequence start detected: 'ESC-['\n");
 			i++;
 		} else {
 			/* evaluate '2-char' sequence */
-			evm_log_debug("2-char sequence: 'ESC'-%d\n", line[i]);
+			evm_log_debug("Unexpected 2-char sequence: 'ESC'-%d\n", line[i]);
 			REMOVE_FROM_LINE(line, i, 1);
 		}
 	}
@@ -325,6 +413,7 @@ static int evaluate2char_sequence(char *const line, int i, char *const rline, in
 static int evaluate1char_sequence(char *const line, int i, char *const rline, int *const rip)
 {
 	int j;
+	evm_log_info("(entry) i=%d\n", i);
 
 	if (line[i] == '\0')
 		return i;
@@ -343,6 +432,14 @@ static int evaluate1char_sequence(char *const line, int i, char *const rline, in
 			evm_log_debug("Removed previous TAB input (i=%d)\n", i);
 		}
 	}
+
+	if (line[i - 0] == 27 /*ESC*/) {
+		/* Extra ESC-... handling */
+		evm_log_debug("Potential ESC sequence start\n");
+		i++;
+		return i;
+	}
+
 	if (isprint(line[i])) {
 		/* Printable single character input */
 		evm_log_debug("Printable character input\n");
@@ -388,10 +485,6 @@ static int evaluate1char_sequence(char *const line, int i, char *const rline, in
 					printf("\b");
 				fflush(stdout);
 			}
-		} else
-		if (line[i] == 27 /*ESC*/) {
-			evm_log_debug("Key ESCAPE pressed\n");
-			i++;
 		} else {
 			evm_log_debug("Unexpected Key (%d) pressed\n", line[i]);
 		}
@@ -435,7 +528,20 @@ static int getherCmdLine(char *cmdline, int size)
 		/*
 		 * Evaluate input sequences and chars
 		 */
-		/* Start with longest CSI sequences (3-chars) */
+		/* Start with longest ESC sequences (4-chars) */
+		if (i >= 3) {
+			evm_log_debug("(i >= 3) i=%d, ri=%d\n", i, ri);
+			i = evaluate4char_sequence(line, i, rline, &ri);
+			if (i >= 1) {
+				i = evaluate3char_sequence(line, i, rline, &ri);
+				if (i >= 0) {
+					i = evaluate2char_sequence(line, i, rline, &ri);
+					if (i >= 0) {
+						i = evaluate1char_sequence(line, i, rline, &ri);
+					}
+				}
+			}
+		} else
 		if (i >= 2) {
 			evm_log_debug("(i >= 2) i=%d, ri=%d\n", i, ri);
 			i = evaluate3char_sequence(line, i, rline, &ri);
@@ -445,13 +551,15 @@ static int getherCmdLine(char *cmdline, int size)
 					i = evaluate1char_sequence(line, i, rline, &ri);
 				}
 			}
-		} else if (i >= 1) {
+		} else
+		if (i >= 1) {
 			evm_log_debug("(i >= 1) i=%d, ri=%d\n", i, ri);
 			i = evaluate2char_sequence(line, i, rline, &ri);
 			if (i >= 0) {
 				i = evaluate1char_sequence(line, i, rline, &ri);
 			}
-		} else if (i >= 0) {
+		} else
+		if (i >= 0) {
 			evm_log_debug("(i >= 0) i=%d, ri=%d\n", i, ri);
 			i = evaluate1char_sequence(line, i, rline, &ri);
 		} else {
