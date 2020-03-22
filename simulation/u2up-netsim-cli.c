@@ -431,7 +431,7 @@ int main(int argc, char *argv[])
 {
 	int rv = 0;
 	int sockfd;
-	char snd_buf[CLISRV_MAX_MSGSZ] = "";
+	char snd_buf[CLISRV_MAX_CMDSZ] = "";
 	char rcv_buf[CLISRV_MAX_MSGSZ] = "";
 	char *pre_begin, *pre_end, *remain_str;
 	
@@ -447,10 +447,10 @@ int main(int argc, char *argv[])
 	while (U2UP_NET_TRUE) {
 #if 0 /*orig*/
 		/* Enter one line message string to be sent */
-		fgets(snd_buf, CLISRV_MAX_MSGSZ, stdin);
+		fgets(snd_buf, CLISRV_MAX_CMDSZ, stdin);
 #else
 		/* Gether-together a cmd-line */
-		if (getherCmdLine(snd_buf, CLISRV_MAX_MSGSZ) < 0) {
+		if (getherCmdLine(snd_buf, CLISRV_MAX_CMDSZ) < 0) {
 			evm_log_error("getherCmdLine()\n");
 			close(sockfd);
 			break;
@@ -506,7 +506,7 @@ int main(int argc, char *argv[])
 					printf("\n");
 			}
 		}
-		strncat(snd_buf, remain_str, CLISRV_MAX_MSGSZ);
+		strncat(snd_buf, remain_str, CLISRV_MAX_CMDSZ);
 
 		if (strlen(remain_str) > 0) {
 			if (remain_str[strlen(remain_str) - 1] == '\t') {

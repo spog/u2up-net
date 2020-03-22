@@ -38,7 +38,8 @@
 
 #define CLISRV_SOCK_PATH "/tmp/u2up-netsim-cli"
 #define LISTEN_BACKLOG 50
-#define CLISRV_MAX_MSGSZ 512
+#define CLISRV_MAX_CMDSZ 512
+#define CLISRV_MAX_MSGSZ 1024
 
 EXTERN int simulation_clisrv_init(evmStruct *evm);
 

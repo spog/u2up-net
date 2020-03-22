@@ -967,7 +967,7 @@ static int autoCmdLine(clisrv_pconn_struct *pconn, int mode)
 {
 	int rv = 0, i;
 	char *token;
-	char buff[1024] = "";
+	char buff[CLISRV_MAX_MSGSZ] = "";
 	evm_log_info("(entry) pconn=%p\n", pconn);
 
 	if (pconn == NULL) {
@@ -976,9 +976,9 @@ static int autoCmdLine(clisrv_pconn_struct *pconn, int mode)
 	}
 
 	if (mode == CLISRV_AUTO_SUGGEST)
-		strncat (buff, "<pre>", 1024);
+		strncat (buff, "<pre>", CLISRV_MAX_MSGSZ);
 
-	if ((rv = setCliCmdsResponseByTokens(clisrv_pcmds, pconn, buff, 1024, mode)) < 0) {
+	if ((rv = setCliCmdsResponseByTokens(clisrv_pcmds, pconn, buff, CLISRV_MAX_MSGSZ, mode)) < 0) {
 		evm_log_error("setCliCmdResponseByTokens() failed\n");
 		return -1;
 	}
@@ -994,7 +994,7 @@ static int autoCmdLine(clisrv_pconn_struct *pconn, int mode)
 		} else {
 			/* If AUTO-COMPLETE returns more matches, send back only '\t'! */
 			printf("Auto-Complete(pconn->msgsz=%d):'%s'\n", pconn->msgsz, pconn->msg);
-			strncat(buff, "\t", 1024);
+			strncat(buff, "\t", CLISRV_MAX_MSGSZ);
 			printf("Auto-Complete-send(len=1):'%s'\n", buff);
 			if ((rv = send(pconn->fd, buff, (strlen(buff) + 1), 0)) < 0) {
 				evm_log_system_error("send()\n");
@@ -1003,7 +1003,7 @@ static int autoCmdLine(clisrv_pconn_struct *pconn, int mode)
 #else
 		printf("Auto-Complete(buff_len=%ld):'%s'\n", strlen(buff), buff);
 		printf("Auto-Complete(pconn->msgsz=%d):'%s'\n", pconn->msgsz, pconn->msg);
-		strncat(buff, "\t", 1024);
+		strncat(buff, "\t", CLISRV_MAX_MSGSZ);
 		printf("Auto-Complete-send(len=1):'%s'\n", buff);
 		if ((rv = send(pconn->fd, buff, (strlen(buff) + 1), 0)) < 0) {
 			evm_log_system_error("send()\n");
@@ -1012,8 +1012,8 @@ static int autoCmdLine(clisrv_pconn_struct *pconn, int mode)
 		break;
 	case CLISRV_AUTO_SUGGEST:
 		{
-			strncat (buff, "</pre>", 1024);
-			strncat (buff, pconn->msg, 1024);
+			strncat (buff, "</pre>", CLISRV_MAX_MSGSZ);
+			strncat (buff, pconn->msg, CLISRV_MAX_MSGSZ);
 			printf("Auto-Suggest(len=%ld, pconn->msgsz=%d):'%s'\n", strlen(buff), pconn->msgsz, buff);
 			/* Echo the data back to the client */
 			if ((rv = send(pconn->fd, buff, (strlen(buff) + 1), 0)) < 0) {
@@ -1029,7 +1029,7 @@ static int execCmdLine(clisrv_pconn_struct *pconn)
 {
 	int rv = 0, i;
 	char *token;
-	char buff[1024] = "";
+	char buff[CLISRV_MAX_MSGSZ] = "";
 	evm_log_info("(entry) pconn=%p\n", pconn);
 
 	if (pconn == NULL) {
@@ -1037,9 +1037,9 @@ static int execCmdLine(clisrv_pconn_struct *pconn)
 		return -1;
 	}
 
-	strncat (buff, "<pre>", 1024);
-	strncat (buff, pconn->msg, 1024);
-	strncat (buff, "</pre>", 1024);
+	strncat (buff, "<pre>", CLISRV_MAX_MSGSZ);
+	strncat (buff, pconn->msg, CLISRV_MAX_MSGSZ);
+	strncat (buff, "</pre>", CLISRV_MAX_MSGSZ);
 	printf("sending msg: '%s'\n", buff);
 	/* Echo the data back to the client */
 	if ((rv = send(pconn->fd, buff, (strlen(buff) + 1), 0)) < 0) {
@@ -1157,7 +1157,7 @@ void * clisrv_ppoll_loop(void *arg)
 	struct pollfd *newClisrvFds;
 	struct clisrv_conn *newClisrvConns;
 	clisrv_pconn_struct *pconn;
-	char buffer[CLISRV_MAX_MSGSZ];
+	char buffer[CLISRV_MAX_CMDSZ];
 	evm_log_info("(entry)\n");
 
 	/* Loop waiting for incoming connects or incoming data */
