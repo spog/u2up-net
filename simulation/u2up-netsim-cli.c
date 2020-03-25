@@ -456,22 +456,6 @@ static int evaluate1char_sequence(char *const line, int i, char *const rline, in
 			evm_log_debug("Key TAB pressed\n");
 			i++;
 		} else
-		if (line[i] == '\n') {
-			evm_log_debug("Key ENTER pressed (i=%d, *rip=%d)\n", i, *rip);
-			line[i] = '\0';
-			strncat(line, &rline[*rip], CLISRV_MAX_CMDSZ);
-			*rip = CLISRV_MAX_CMDSZ - 1;
-			i = strlen(line);
-			if (i < (CLISRV_MAX_CMDSZ - 1)) {
-				line[i] = '\n';
-				i++;
-				line[i] = '\0';
-			} else {
-				line[i - 1] = '\n';
-			}
-			printf("\n");
-			fflush(stdout);
-		} else
 		if (line[i] == 127) {
 			evm_log_debug("Key BACKSPACE pressed\n");
 			line[i] = '\0';
@@ -485,6 +469,22 @@ static int evaluate1char_sequence(char *const line, int i, char *const rline, in
 					printf("\b");
 				fflush(stdout);
 			}
+		} else
+		if (line[i] == '\n') {
+			evm_log_debug("Key ENTER pressed (i=%d, *rip=%d)\n", i, *rip);
+			line[i] = '\0';
+			strncat(line, &rline[*rip], (CLISRV_MAX_CMDSZ - strlen(line)));
+			*rip = CLISRV_MAX_CMDSZ - 1;
+			i = strlen(line);
+			if (i < (CLISRV_MAX_CMDSZ - 1)) {
+				line[i] = '\n';
+				i++;
+				line[i] = '\0';
+			} else {
+				line[i - 1] = '\n';
+			}
+			printf("\n");
+			fflush(stdout);
 		} else {
 			evm_log_debug("Unexpected Key (%d) pressed\n", line[i]);
 		}
@@ -493,7 +493,7 @@ static int evaluate1char_sequence(char *const line, int i, char *const rline, in
 	return i;
 }
 
-static int getherCmdLine(char *cmdline, int size)
+static int getherCmdLine(char * const cmdline, int size)
 {
 	static char rline[CLISRV_MAX_CMDSZ];
 	static int ri = CLISRV_MAX_CMDSZ - 1;
@@ -658,7 +658,7 @@ int main(int argc, char *argv[])
 					printf("\n");
 			}
 		}
-		strncat(snd_buf, remain_str, CLISRV_MAX_CMDSZ);
+		strncat(snd_buf, remain_str, (CLISRV_MAX_CMDSZ - strlen(snd_buf)));
 
 		if (strlen(remain_str) > 0) {
 			if (remain_str[strlen(remain_str) - 1] == '\t') {
