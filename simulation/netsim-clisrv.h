@@ -41,6 +41,14 @@
 #define CLISRV_MAX_CMDSZ 512
 #define CLISRV_MAX_MSGSZ 1024
 
+static inline char * clisrv_strncat(char *dst, const char *src, int dstsz)
+{
+	int room = dstsz - strlen(dst) - 1;
+	if (room > 0)
+		return strncat(dst, src, room);
+	return dst;
+}
+
 EXTERN int simulation_clisrv_init(evmStruct *evm);
 
 #endif /*U2UP_NET_FILE_netsim_clisrv_h*/

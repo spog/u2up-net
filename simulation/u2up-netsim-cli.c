@@ -473,7 +473,7 @@ static int evaluate1char_sequence(char *const line, int i, char *const rline, in
 		if (line[i] == '\n') {
 			evm_log_debug("Key ENTER pressed (i=%d, *rip=%d)\n", i, *rip);
 			line[i] = '\0';
-			strncat(line, &rline[*rip], (CLISRV_MAX_CMDSZ - strlen(line)));
+			clisrv_strncat(line, &rline[*rip], (CLISRV_MAX_CMDSZ - strlen(line) - 1));
 			*rip = CLISRV_MAX_CMDSZ - 1;
 			i = strlen(line);
 			if (i < (CLISRV_MAX_CMDSZ - 1)) {
@@ -658,7 +658,7 @@ int main(int argc, char *argv[])
 					printf("\n");
 			}
 		}
-		strncat(snd_buf, remain_str, (CLISRV_MAX_CMDSZ - strlen(snd_buf)));
+		clisrv_strncat(snd_buf, remain_str, (CLISRV_MAX_CMDSZ - strlen(snd_buf) - 1));
 
 		if (strlen(remain_str) > 0) {
 			if (remain_str[strlen(remain_str) - 1] == '\t') {
