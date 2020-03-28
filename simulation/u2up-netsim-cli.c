@@ -224,6 +224,7 @@ typedef struct netsim_cli_log_entry netsimCliLogEntryStruct;
 struct netsim_cli_log {
 	FILE *file;
 	netsimCliLogEntryStruct *first;
+	netsimCliLogEntryStruct *last;
 }; /*netsimCliLogStruct*/
 
 struct netsim_cli_log_entry {
@@ -233,15 +234,14 @@ struct netsim_cli_log_entry {
 }; /*netsimCliLogEntryStruct*/
 
 static netsimCliLogStruct netsimCliLog;
-static netsimCliLogEntryStruct * cliLogEntryLast;
 static char incomplete_line[CLISRV_MAX_CMDSZ];
 
 #define CLISRV_BUFFSZ 16
 
-static netsimCliLogEntryStruct * initCmdLineLog(char *fileName, netsimCliLogStruct *log)
+static int initCmdLineLog(char *fileName, netsimCliLogStruct *log)
 {
 	static char buff[CLISRV_BUFFSZ];
-	static char line[CLISRV_MAX_CMDSZ] = "---mark begin---";
+	static char line[CLISRV_MAX_CMDSZ];
 	netsimCliLogEntryStruct **tmp, *prev;
 	char *token, *nl;
 	int tokensz, consumed;
@@ -249,32 +249,27 @@ static netsimCliLogEntryStruct * initCmdLineLog(char *fileName, netsimCliLogStru
 
 	if (fileName == NULL) {
 		evm_log_error("History log filename not specified!\n");
-		return NULL;
+		return -1;
 	}
 
 	if (log == NULL) {
 		evm_log_error("History log structure pointer not specified!\n");
-		return NULL;
+		return -1;
 	}
 
 	log->file = fopen(fileName, "a+");
 	if (log->file == NULL) {
 		evm_log_system_error("fopen()\n");
-		return NULL;
+		return -1;
 	}
 
-	prev = NULL;
 	tmp = &(log->first);
 	if ((*tmp = (netsimCliLogEntryStruct *)calloc(1, sizeof(netsimCliLogEntryStruct))) == NULL) {
 		evm_log_system_error("calloc() - Log entry struct\n");
 		abort();
 	}
-	(*tmp)->prev = prev;
-	if (((*tmp)->entry = (char *)calloc((strlen(line) + 1), sizeof(char))) == NULL) {
-		evm_log_system_error("calloc() - Log entry line\n");
-		abort();
-	}
-	strncpy((*tmp)->entry, line, (strlen(line) + 1));
+	(*tmp)->prev = *tmp;
+	(*tmp)->entry = NULL;
 	line[0] = '\0';
 	prev = *tmp;
 	tmp = &((*tmp)->next);
@@ -319,11 +314,19 @@ static netsimCliLogEntryStruct * initCmdLineLog(char *fileName, netsimCliLogStru
 		if (n < (CLISRV_BUFFSZ - 1))
 			break;
 	}
+	if ((*tmp = (netsimCliLogEntryStruct *)calloc(1, sizeof(netsimCliLogEntryStruct))) == NULL) {
+		evm_log_system_error("calloc() - Log entry struct\n");
+		abort();
+	}
+	(*tmp)->prev = prev;
+	(*tmp)->next = *tmp;
+	(*tmp)->entry = NULL;
+	log->last = *tmp;
 
-	return prev;
+	return 0;
 }
 
-static netsimCliLogEntryStruct * saveCmdLineLog(char *cmdline, netsimCliLogStruct *log, netsimCliLogEntryStruct *last)
+static int saveCmdLineLog(char *cmdline, netsimCliLogStruct *log)
 {
 	netsimCliLogEntryStruct **tmp, *prev;
 	size_t n = 0;
@@ -335,32 +338,29 @@ static netsimCliLogEntryStruct * saveCmdLineLog(char *cmdline, netsimCliLogStruc
 	if (log->file == NULL)
 		abort();
 
-	if (last == NULL)
-		abort();
-
-	if (last->entry == NULL)
-		abort();
-
 	if (cmdline == NULL)
 		abort();
 
 	if (cmdline[0] == '\n')
-		return last;
+		return 0;
 
 	if ((len = strlen(cmdline) - 1) <= 0)
-		return last;
+		return 0;
 
-	evm_log_debug("len=%d, last->entry=%s\n", len, last->entry);
-	if ((strlen(cmdline) == (strlen(last->entry) + 1)) && (strncmp(cmdline, last->entry, len) == 0))
-		return last;
+	prev = log->last->prev;
+	evm_log_debug("len=%d, prev->entry=%s\n", len, prev->entry);
+	if (prev->entry != NULL)
+		if ((strlen(cmdline) == (strlen(prev->entry) + 1)) && (strncmp(cmdline, prev->entry, len) == 0))
+			return 0;
 
-	prev = last;
-	tmp = &(last->next);
+	tmp = &(prev->next);
 	if ((*tmp = (netsimCliLogEntryStruct *)calloc(1, sizeof(netsimCliLogEntryStruct))) == NULL) {
 		evm_log_system_error("calloc() - Log entry struct\n");
 		abort();
 	}
 	(*tmp)->prev = prev;
+	(*tmp)->next = log->last;
+	log->last->prev = *tmp;
 	if (((*tmp)->entry = (char *)calloc((len/* + 1*/), sizeof(char))) == NULL) {
 		evm_log_system_error("calloc() - Log entry new cmdline\n");
 		abort();
@@ -372,7 +372,7 @@ static netsimCliLogEntryStruct * saveCmdLineLog(char *cmdline, netsimCliLogStruc
 	fwrite("\n", sizeof(char), 1, log->file);
 	fflush(log->file);
 
-	return *tmp;
+	return 0;
 }
 
 static char getchr()
@@ -449,7 +449,6 @@ static netsimCliLogEntryStruct *cliLogEntryCurrent = NULL;
 
 static int evaluate3char_sequence(char *const line, int i, char *const rline, int *const rip)
 {
-	netsimCliLogEntryStruct *lastcmd;
 	evm_log_info("(entry) i=%d\n", i);
 
 	if (line[i] == '\0')
@@ -468,33 +467,35 @@ static int evaluate3char_sequence(char *const line, int i, char *const rline, in
 			REMOVE_FROM_LINE(line, i, 2);
 			line[i] = '\0';
 			if (cliLogEntryCurrent == NULL) {
-				cliLogEntryCurrent = cliLogEntryLast;
+				cliLogEntryCurrent = netsimCliLog.last;
+				evm_log_debug("Initialized cliLogEntryCurrent to last (dummy)!'\n");
 			}
-			if (cliLogEntryCurrent->prev != NULL) {
+			if (cliLogEntryCurrent != cliLogEntryCurrent->prev) {
 				if (i > 0) {
 					clisrv_strncat(line, &rline[*rip], CLISRV_MAX_CMDSZ);
-					evm_log_debug("line='%s'\n", line);
+					evm_log_debug("old-line='%s'\n", line);
 					printf("%s", &rline[*rip]);
 					fflush(stdout);
 					*rip = CLISRV_MAX_CMDSZ - 1;
 					i = strlen(line);
-					if (cliLogEntryCurrent == cliLogEntryLast) {
-						incomplete_line[0] = '\0';
-						clisrv_strncat(incomplete_line, line, CLISRV_MAX_CMDSZ);
-					}
 				}
-				if (cliLogEntryCurrent != NULL) {
+				if (cliLogEntryCurrent == netsimCliLog.last) {
+					incomplete_line[0] = '\0';
+					clisrv_strncat(incomplete_line, line, CLISRV_MAX_CMDSZ);
+				}
+				cliLogEntryCurrent = cliLogEntryCurrent->prev;
+				if (cliLogEntryCurrent != cliLogEntryCurrent->prev) {
 					while (i > 0) {
 						printf("\b \b");
 						i--;
 					}
 					line[0] = '\0';
 					clisrv_strncat(line, cliLogEntryCurrent->entry, CLISRV_MAX_CMDSZ);
-					i = strlen(line)/* - 1*/;
+					evm_log_debug("new-line='%s'\n", line);
+					i = strlen(line);
 					line[i] = '\0';
 					printf("%s", line);
 					fflush(stdout);
-					cliLogEntryCurrent = cliLogEntryCurrent->prev;
 				}
 			}
 		} else
@@ -503,51 +504,46 @@ static int evaluate3char_sequence(char *const line, int i, char *const rline, in
 			REMOVE_FROM_LINE(line, i, 2);
 			line[i] = '\0';
 			if (cliLogEntryCurrent == NULL) {
-				cliLogEntryCurrent = cliLogEntryLast;
+				cliLogEntryCurrent = netsimCliLog.last;
+				evm_log_debug("Initialized cliLogEntryCurrent to last (dummy)!'\n");
 			}
-			if (cliLogEntryCurrent->next != NULL) {
+			if (cliLogEntryCurrent == cliLogEntryCurrent->prev)
+				cliLogEntryCurrent = cliLogEntryCurrent->next;
+			if (cliLogEntryCurrent != cliLogEntryCurrent->next) {
 				if (i > 0) {
 					clisrv_strncat(line, &rline[*rip], CLISRV_MAX_CMDSZ);
-					evm_log_debug("line='%s'\n", line);
+					evm_log_debug("old-line='%s'\n", line);
 					printf("%s", &rline[*rip]);
 					fflush(stdout);
 					*rip = CLISRV_MAX_CMDSZ - 1;
 					i = strlen(line);
-					if (i < (CLISRV_MAX_CMDSZ - 1)) {
-						line[i] = '\n';
-						i++;
-						line[i] = '\0';
-					} else {
-						line[i - 1] = '\n';
-					}
 				}
-				if (cliLogEntryCurrent != NULL) {
-					if ((i > 0) && (line[i - 1] == '\n'))
-						i--;
+				cliLogEntryCurrent = cliLogEntryCurrent->next;
+				if (cliLogEntryCurrent != cliLogEntryCurrent->next) {
 					while (i > 0) {
 						printf("\b \b");
 						i--;
 					}
 					line[0] = '\0';
-					cliLogEntryCurrent = cliLogEntryCurrent->next;
 					clisrv_strncat(line, cliLogEntryCurrent->entry, CLISRV_MAX_CMDSZ);
+					evm_log_debug("new-line='%s'\n", line);
+					i = strlen(line);
+					line[i] = '\0';
+					printf("%s", line);
+					fflush(stdout);
+				} else {
+					while (i > 0) {
+						printf("\b \b");
+						i--;
+					}
+					line[0] = '\0';
+					clisrv_strncat(line, incomplete_line, CLISRV_MAX_CMDSZ);
+					incomplete_line[0] = '\0';
 					i = strlen(line)/* - 1*/;
 					line[i] = '\0';
 					printf("%s", line);
 					fflush(stdout);
 				}
-			} else {
-				while (i > 0) {
-					printf("\b \b");
-					i--;
-				}
-				line[0] = '\0';
-				clisrv_strncat(line, incomplete_line, CLISRV_MAX_CMDSZ);
-				incomplete_line[0] = '\0';
-				i = strlen(line)/* - 1*/;
-				line[i] = '\0';
-				printf("%s", line);
-				fflush(stdout);
 			}
 		} else
 		if (line[i] == 67 /*'C'*/) {
@@ -652,7 +648,7 @@ static int evaluate2char_sequence(char *const line, int i, char *const rline, in
 static int evaluate1char_sequence(char *const line, int i, char *const rline, int *const rip)
 {
 	int j;
-	netsimCliLogEntryStruct *lastcmd;
+//	netsimCliLogEntryStruct *lastcmd;
 	evm_log_info("(entry) i=%d\n", i);
 
 	if (line[i] == '\0')
@@ -725,11 +721,10 @@ static int evaluate1char_sequence(char *const line, int i, char *const rline, in
 			}
 			printf("\n");
 			fflush(stdout);
-			if ((lastcmd = saveCmdLineLog(line, &netsimCliLog, cliLogEntryLast)) != NULL) {
+			if (saveCmdLineLog(line, &netsimCliLog) == 0) {
 				evm_log_debug("Successfully saved new cmdline!\n");
-				cliLogEntryLast = lastcmd;
 			}
-			cliLogEntryCurrent = cliLogEntryLast;
+			cliLogEntryCurrent = netsimCliLog.last;
 		} else {
 			evm_log_debug("Unexpected Key (%d) pressed\n", line[i]);
 		}
@@ -759,7 +754,6 @@ static int getherCmdLine(char * const cmdline, int size)
 		printf("\b");
 	fflush(stdout);
 
-#if 1
 	do {
 		line[i] = getchr();
 		evm_log_debug("line[%d]=%d\n", i, line[i]);
@@ -816,7 +810,6 @@ static int getherCmdLine(char * const cmdline, int size)
 			break;
 
 	} while (i < size);
-#endif
 
 	return 0;
 }
@@ -841,7 +834,7 @@ int main(int argc, char *argv[])
 	}
 
 	/* Initialize History-log file */
-	if ((cliLogEntryLast = initCmdLineLog(".u2up_clisrv_cmdlog", &netsimCliLog)) == NULL) {
+	if (initCmdLineLog(".u2up_clisrv_cmdlog", &netsimCliLog) < 0) {
 		evm_log_error("initCmdLineLog()\n");
 		exit(EXIT_FAILURE);
 	}
