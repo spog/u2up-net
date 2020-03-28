@@ -234,6 +234,7 @@ struct netsim_cli_log_entry {
 
 static netsimCliLogStruct netsimCliLog;
 static netsimCliLogEntryStruct * cliLogEntryLast;
+static char incomplete_line[CLISRV_MAX_CMDSZ];
 
 #define CLISRV_BUFFSZ 16
 
@@ -477,24 +478,12 @@ static int evaluate3char_sequence(char *const line, int i, char *const rline, in
 					fflush(stdout);
 					*rip = CLISRV_MAX_CMDSZ - 1;
 					i = strlen(line);
-					if (i < (CLISRV_MAX_CMDSZ - 1)) {
-						line[i] = '\n';
-						i++;
-						line[i] = '\0';
-					} else {
-						line[i - 1] = '\n';
-					}
 					if (cliLogEntryCurrent == cliLogEntryLast) {
-						if ((lastcmd = saveCmdLineLog(line, &netsimCliLog, cliLogEntryLast)) != NULL) {
-							evm_log_debug("Successfully saved new cmdline!\n");
-							cliLogEntryLast = lastcmd;
-						}
-						cliLogEntryCurrent = cliLogEntryLast->prev;
+						incomplete_line[0] = '\0';
+						clisrv_strncat(incomplete_line, line, CLISRV_MAX_CMDSZ);
 					}
 				}
 				if (cliLogEntryCurrent != NULL) {
-					if ((i > 0) && (line[i - 1] == '\n'))
-						i--;
 					while (i > 0) {
 						printf("\b \b");
 						i--;
@@ -512,6 +501,54 @@ static int evaluate3char_sequence(char *const line, int i, char *const rline, in
 		if (line[i] == 66 /*'B'*/) {
 			evm_log_debug("Key DOWN pressed\n");
 			REMOVE_FROM_LINE(line, i, 2);
+			line[i] = '\0';
+			if (cliLogEntryCurrent == NULL) {
+				cliLogEntryCurrent = cliLogEntryLast;
+			}
+			if (cliLogEntryCurrent->next != NULL) {
+				if (i > 0) {
+					clisrv_strncat(line, &rline[*rip], CLISRV_MAX_CMDSZ);
+					evm_log_debug("line='%s'\n", line);
+					printf("%s", &rline[*rip]);
+					fflush(stdout);
+					*rip = CLISRV_MAX_CMDSZ - 1;
+					i = strlen(line);
+					if (i < (CLISRV_MAX_CMDSZ - 1)) {
+						line[i] = '\n';
+						i++;
+						line[i] = '\0';
+					} else {
+						line[i - 1] = '\n';
+					}
+				}
+				if (cliLogEntryCurrent != NULL) {
+					if ((i > 0) && (line[i - 1] == '\n'))
+						i--;
+					while (i > 0) {
+						printf("\b \b");
+						i--;
+					}
+					line[0] = '\0';
+					cliLogEntryCurrent = cliLogEntryCurrent->next;
+					clisrv_strncat(line, cliLogEntryCurrent->entry, CLISRV_MAX_CMDSZ);
+					i = strlen(line)/* - 1*/;
+					line[i] = '\0';
+					printf("%s", line);
+					fflush(stdout);
+				}
+			} else {
+				while (i > 0) {
+					printf("\b \b");
+					i--;
+				}
+				line[0] = '\0';
+				clisrv_strncat(line, incomplete_line, CLISRV_MAX_CMDSZ);
+				incomplete_line[0] = '\0';
+				i = strlen(line)/* - 1*/;
+				line[i] = '\0';
+				printf("%s", line);
+				fflush(stdout);
+			}
 		} else
 		if (line[i] == 67 /*'C'*/) {
 			evm_log_debug("Key RIGHT pressed\n");
