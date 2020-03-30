@@ -198,7 +198,7 @@ static int enable_handle(clisrv_cmd_struct *this, clisrv_pconn_struct *pconn_cmd
 static int quit_handle(clisrv_cmd_struct *this, clisrv_pconn_struct *pconn_cmd, char *buff, int size)
 {
 	printf("quit command handle called!'\n");
-	return -10;
+	return 127;
 }
 
 #if 1 /*test*/
@@ -1123,8 +1123,11 @@ static int execCmdLine(clisrv_pconn_struct *pconn)
 		case (-3):
 			clisrv_strncat(buff, "error: invalid command syntax", CLISRV_MAX_MSGSZ);
 			break;
-		case (-10):
-			clisrv_strncat(buff, "bye...", CLISRV_MAX_MSGSZ);
+		}
+	} else {
+		switch (rv) {
+		case (127):
+			clisrv_strncat(buff, "Bye...", CLISRV_MAX_MSGSZ);
 			close_conn = 1;
 			break;
 		}
