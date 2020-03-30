@@ -903,6 +903,12 @@ int main(int argc, char *argv[])
 					printf("\n");
 			}
 		}
+		if (strlen(remain_str) >= strlen("<quit>")) {
+			if (strstr(remain_str, "<quit>") != NULL) {
+				evm_log_debug("quit command confirmation received - exit!\n");
+				break;
+			}
+		}
 		clisrv_strncat(snd_buf, remain_str, CLISRV_MAX_CMDSZ);
 
 		if (strlen(remain_str) > 0) {

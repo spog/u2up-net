@@ -119,7 +119,7 @@ struct clisrv_cmd {
 	int cmdsz;
 	clisrv_token_struct *tokens;
 	int nr_tokens;
-	int (*cmd_handle)(clisrv_pconn_struct *pconn_cmd);
+	int (*cmd_handle)(clisrv_cmd_struct *this, clisrv_pconn_struct *pconn_cmd, char *buff, int size);
 };
 
 typedef struct clisrv_cmds {
@@ -134,6 +134,7 @@ static char *clisrv_cmds[] = {
 	"dump [prefix=%s]",
 	"disable addr=%.8x",
 	"enable {all | addr=%.8x | id=%u}",
+	"quit",
 #if 1 /*test*/
 	"test1 {a b c}",
 	"test2 {a} {b} {c}",
@@ -141,6 +142,84 @@ static char *clisrv_cmds[] = {
 #endif
 	NULL
 };
+
+static int help_handle(clisrv_cmd_struct *this, clisrv_pconn_struct *pconn_cmd, char *buff, int size);
+static int dump_handle(clisrv_cmd_struct *this, clisrv_pconn_struct *pconn_cmd, char *buff, int size);
+static int disable_handle(clisrv_cmd_struct *this, clisrv_pconn_struct *pconn_cmd, char *buff, int size);
+static int enable_handle(clisrv_cmd_struct *this, clisrv_pconn_struct *pconn_cmd, char *buff, int size);
+static int quit_handle(clisrv_cmd_struct *this, clisrv_pconn_struct *pconn_cmd, char *buff, int size);
+#if 1 /*test*/
+static int test1_handle(clisrv_cmd_struct *this, clisrv_pconn_struct *pconn_cmd, char *buff, int size);
+static int test2_handle(clisrv_cmd_struct *this, clisrv_pconn_struct *pconn_cmd, char *buff, int size);
+static int test3_handle(clisrv_cmd_struct *this, clisrv_pconn_struct *pconn_cmd, char *buff, int size);
+#endif
+
+static int (*cmd_handle[])(clisrv_cmd_struct *this, clisrv_pconn_struct *pconn_cmd, char *buff, int size) = {
+	help_handle,
+	dump_handle,
+	disable_handle,
+	enable_handle,
+	quit_handle,
+#if 1 /*test*/
+	test1_handle,
+	test2_handle,
+	test3_handle,
+#endif
+};
+
+static int help_handle(clisrv_cmd_struct *this, clisrv_pconn_struct *pconn_cmd, char *buff, int size)
+{
+	printf("help command handle called!'\n");
+	clisrv_strncat(buff, "\nPress TAB-TAB to display all available commands.\n", size);
+	clisrv_strncat(buff, "Use TAB for auto-complete.\n", size);
+	clisrv_strncat(buff, "Use TAB-TAB for auto-suggest.\n", size);
+	clisrv_strncat(buff, "Use UP and DOWN keys to walk the commands history.\n", size);
+	return 0;
+}
+
+static int dump_handle(clisrv_cmd_struct *this, clisrv_pconn_struct *pconn_cmd, char *buff, int size)
+{
+	printf("dump command handle called!'\n");
+	return 0;
+}
+
+static int disable_handle(clisrv_cmd_struct *this, clisrv_pconn_struct *pconn_cmd, char *buff, int size)
+{
+	printf("disable command handle called!'\n");
+	return 0;
+}
+
+static int enable_handle(clisrv_cmd_struct *this, clisrv_pconn_struct *pconn_cmd, char *buff, int size)
+{
+	printf("enable command handle called!'\n");
+	return 0;
+}
+
+static int quit_handle(clisrv_cmd_struct *this, clisrv_pconn_struct *pconn_cmd, char *buff, int size)
+{
+	printf("quit command handle called!'\n");
+	return -10;
+}
+
+#if 1 /*test*/
+static int test1_handle(clisrv_cmd_struct *this, clisrv_pconn_struct *pconn_cmd, char *buff, int size)
+{
+	printf("test1 command handle called!'\n");
+	return 0;
+}
+
+static int test2_handle(clisrv_cmd_struct *this, clisrv_pconn_struct *pconn_cmd, char *buff, int size)
+{
+	printf("test2 command handle called!'\n");
+	return 0;
+}
+
+static int test3_handle(clisrv_cmd_struct *this, clisrv_pconn_struct *pconn_cmd, char *buff, int size)
+{
+	printf("test3 command handle called!'\n");
+	return 0;
+}
+#endif
 
 static int evClisrvInitMsg(evmConsumerStruct *consumer, evmMessageStruct *msg)
 {
@@ -499,6 +578,7 @@ static clisrv_cmds_struct * tokenizeCliCmds(char *clicmds[])
 		if ((*tmp = tokenizeCliCmd(clicmds[i])) == NULL) {
 			abort();
 		}
+		(*tmp)->cmd_handle = cmd_handle[i];
 		tmp = &(*tmp)->next;
 		i++;
 	}
@@ -888,7 +968,6 @@ static int setCliCmdsResponseByTokens(clisrv_cmds_struct *pcmds, clisrv_pconn_st
 				printf("3 - opt_part_found=%d\n", opt_part_found);
 			}
 		}
-
 	}
 
 	/* Adding additional space to auto-complete, if needed! */
@@ -1016,12 +1095,13 @@ static int execCliCmdsTokens(clisrv_cmds_struct *pcmds, clisrv_pconn_struct *pco
 		return -2;
 	}
 
-	return 0;
+	return pcmd->cmd_handle(pcmd, pconn, buff, size);
 }
 
 static int execCmdLine(clisrv_pconn_struct *pconn)
 {
 	int rv = 0;
+	int close_conn = 0;
 	char buff[CLISRV_MAX_MSGSZ] = "";
 	char response[CLISRV_MAX_MSGSZ] = "";
 	evm_log_info("(entry) pconn=%p\n", pconn);
@@ -1035,13 +1115,17 @@ static int execCmdLine(clisrv_pconn_struct *pconn)
 		evm_log_error("setCliCmdResponseByTokens() failed\n");
 		switch (rv) {
 		case (-1):
-			clisrv_strncat(buff, "Invalid execution call (check code)!", CLISRV_MAX_MSGSZ);
+			clisrv_strncat(buff, "error: invalid execution call (check code)", CLISRV_MAX_MSGSZ);
 			break;
 		case (-2):
-//			clisrv_strncat(buff, "\nCommand not found!\n", CLISRV_MAX_MSGSZ);
 			clisrv_strncat(buff, "error: unknown command", CLISRV_MAX_MSGSZ);
-//			clisrv_strncat(buff, "error - command not found", CLISRV_MAX_MSGSZ);
-//			clisrv_strncat(buff, "error: command not found", CLISRV_MAX_MSGSZ);
+			break;
+		case (-3):
+			clisrv_strncat(buff, "error: invalid command syntax", CLISRV_MAX_MSGSZ);
+			break;
+		case (-10):
+			clisrv_strncat(buff, "bye...", CLISRV_MAX_MSGSZ);
+			close_conn = 1;
 			break;
 		}
 	}
@@ -1049,11 +1133,15 @@ static int execCmdLine(clisrv_pconn_struct *pconn)
 	clisrv_strncat(response, "<pre>", CLISRV_MAX_MSGSZ);
 	clisrv_strncat(response, buff, CLISRV_MAX_MSGSZ);
 	clisrv_strncat(response, "</pre>", CLISRV_MAX_MSGSZ);
+	if (close_conn != 0) {
+		clisrv_strncat(response, "<quit>", CLISRV_MAX_MSGSZ);
+	}
 	printf("sending msg: '%s'\n", response);
 	/* Echo the data back to the client */
 	if ((rv = send(pconn->fd, response, (strlen(response) + 1), 0)) < 0) {
 		evm_log_system_error("send()\n");
 	}
+
 	return 0;
 }
 
