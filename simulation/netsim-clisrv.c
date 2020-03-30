@@ -180,6 +180,8 @@ static int help_handle(clisrv_cmd_struct *this, clisrv_pconn_struct *pconn_cmd, 
 static int dump_handle(clisrv_cmd_struct *this, clisrv_pconn_struct *pconn_cmd, char *buff, int size)
 {
 	printf("dump command handle called!'\n");
+	u2up_dump_u2up_net_ring(buff, size);
+
 	return 0;
 }
 

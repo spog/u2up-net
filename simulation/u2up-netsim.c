@@ -610,7 +610,7 @@ static u2upNetRingAddrStruct * generateNewNetAddr(u2upNetRingHeadStruct *ring)
 }
 
 static unsigned int secs = 0;
-int dump_u2up_net_ring(u2upNetRingHeadStruct *ring)
+int dump_u2up_net_ring(u2upNetRingHeadStruct *ring, char *buff, int size)
 {
 	u2upNetRingAddrStruct *ring_addr = NULL;
 	u2upNodeRingContactStruct *ctact = NULL;
@@ -622,6 +622,9 @@ int dump_u2up_net_ring(u2upNetRingHeadStruct *ring)
 
 	asprintf(&pathname, "%s_%.8u.gv", outfile, secs);
 	evm_log_notice("(Write file: %s)\n", pathname);
+	if (buff != NULL) {
+		snprintf(buff, size, "Dump u2upNet to: '%s'", pathname);
+	}
 	if ((file = fopen(pathname, "w")) != NULL) {
 		fprintf(file, "/* circo -Tsvg %s -o %s.svg -Nshape=box */\n", pathname, pathname);
 		fprintf(file, "digraph \"u2upNet\" {\n");
@@ -663,6 +666,14 @@ int dump_u2up_net_ring(u2upNetRingHeadStruct *ring)
 	return 0;
 }
 
+int u2up_dump_u2up_net_ring(char *buff, int size)
+{
+	pthread_mutex_lock(&simulation_global_mutex);
+	dump_u2up_net_ring(&net_addr_ring, buff, size);
+	pthread_mutex_unlock(&simulation_global_mutex);
+	return 0;
+}
+
 static int handleTmrAuthBatch(evmConsumerStruct *consumer, evmTimerStruct *tmr)
 {
 	int i;
@@ -675,7 +686,7 @@ static int handleTmrAuthBatch(evmConsumerStruct *consumer, evmTimerStruct *tmr)
 	secs++;
 	if (pthread_mutex_trylock(&simulation_global_mutex) == EBUSY) {
 		evm_log_info("SIGUSR1 RECEIVED!\n");
-		dump_u2up_net_ring(&net_addr_ring);
+		dump_u2up_net_ring(&net_addr_ring, NULL, 0);
 	}
 	pthread_mutex_unlock(&simulation_global_mutex);
 
