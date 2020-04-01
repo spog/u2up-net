@@ -107,9 +107,12 @@ struct clisrv_token {
 	clisrv_token_struct *base;
 	clisrv_token_struct *next;
 	int type; /*(command, argument, value, CTRL)*/
-	int cub;
-	int sqb;
+	int level;
+	int mand;
+	int opti;
+	int altr;
 	char *strval;
+	char eqval[100];
 };
 
 typedef struct clisrv_cmd clisrv_cmd_struct;
@@ -119,7 +122,7 @@ struct clisrv_cmd {
 	int cmdsz;
 	clisrv_token_struct *tokens;
 	int nr_tokens;
-	int (*cmd_handle)(clisrv_cmd_struct *this, clisrv_pconn_struct *pconn_cmd, char *buff, int size);
+	int (*cmd_handle)(clisrv_token_struct *curr_tokens, char *buff, int size);
 };
 
 typedef struct clisrv_cmds {
@@ -136,25 +139,25 @@ static char *clisrv_cmds[] = {
 	"enable {all | addr=%.8x | id=%u}",
 	"quit",
 #if 1 /*test*/
-	"test1 {a b c}",
+	"test1 {a|b c|d}",
 	"test2 {a} {b} {c}",
-	"test3 {a=%d b} {c}",
+	"test3 {a=%d | b|c}|{d | e}",
 #endif
 	NULL
 };
 
-static int help_handle(clisrv_cmd_struct *this, clisrv_pconn_struct *pconn_cmd, char *buff, int size);
-static int dump_handle(clisrv_cmd_struct *this, clisrv_pconn_struct *pconn_cmd, char *buff, int size);
-static int disable_handle(clisrv_cmd_struct *this, clisrv_pconn_struct *pconn_cmd, char *buff, int size);
-static int enable_handle(clisrv_cmd_struct *this, clisrv_pconn_struct *pconn_cmd, char *buff, int size);
-static int quit_handle(clisrv_cmd_struct *this, clisrv_pconn_struct *pconn_cmd, char *buff, int size);
+static int help_handle(clisrv_token_struct *curr_tokens, char *buff, int size);
+static int dump_handle(clisrv_token_struct *curr_tokens, char *buff, int size);
+static int disable_handle(clisrv_token_struct *curr_tokens, char *buff, int size);
+static int enable_handle(clisrv_token_struct *curr_tokens, char *buff, int size);
+static int quit_handle(clisrv_token_struct *curr_tokens, char *buff, int size);
 #if 1 /*test*/
-static int test1_handle(clisrv_cmd_struct *this, clisrv_pconn_struct *pconn_cmd, char *buff, int size);
-static int test2_handle(clisrv_cmd_struct *this, clisrv_pconn_struct *pconn_cmd, char *buff, int size);
-static int test3_handle(clisrv_cmd_struct *this, clisrv_pconn_struct *pconn_cmd, char *buff, int size);
+static int test1_handle(clisrv_token_struct *curr_tokens, char *buff, int size);
+static int test2_handle(clisrv_token_struct *curr_tokens, char *buff, int size);
+static int test3_handle(clisrv_token_struct *curr_tokens, char *buff, int size);
 #endif
 
-static int (*cmd_handle[])(clisrv_cmd_struct *this, clisrv_pconn_struct *pconn_cmd, char *buff, int size) = {
+static int (*cmd_handle[])(clisrv_token_struct *curr_tokens, char *buff, int size) = {
 	help_handle,
 	dump_handle,
 	disable_handle,
@@ -167,7 +170,263 @@ static int (*cmd_handle[])(clisrv_cmd_struct *this, clisrv_pconn_struct *pconn_c
 #endif
 };
 
-static int help_handle(clisrv_cmd_struct *this, clisrv_pconn_struct *pconn_cmd, char *buff, int size)
+static int pconnCmdRemoveToken(clisrv_pconn_struct *pconn, char *token)
+{
+	char *next_token;
+	int i, remain;
+
+	if (pconn == NULL)
+		return -1;
+
+	if (token == NULL)
+		return -1;
+
+	if (pconn->nr_tokens <= 0)
+		return -1;
+
+	if ((token < pconn->tokens) || ((token - pconn->tokens) > (pconn->msgsz + 1)))
+		return -1;
+
+	next_token = token + (strlen(token) + 1);
+	remain = pconn->tokens + pconn->msgsz + 1 - next_token;
+
+#if 1
+	printf("1 - pconn->nr_tokens=%d: ", pconn->nr_tokens);
+	{
+		int rv = 0;
+		char *cmd_token = pconn->tokens;
+		while (rv < pconn->nr_tokens) {
+			printf("'%s' ", cmd_token);
+			cmd_token += (strlen(cmd_token) + 1);
+			rv++;
+		}
+		printf("\n");
+	}
+#endif
+	for (i = 0; i < remain; i++) {
+		token[i] = next_token[i];
+	}
+	pconn->nr_tokens--;
+#if 1
+	printf("1 - pconn->nr_tokens=%d: ", pconn->nr_tokens);
+	{
+		int rv = 0;
+		char *cmd_token = pconn->tokens;
+		while (rv < pconn->nr_tokens) {
+			printf("'%s' ", cmd_token);
+			cmd_token += (strlen(cmd_token) + 1);
+			rv++;
+		}
+		printf("\n");
+	}
+#endif
+
+	return 0;
+}
+
+void freePcmdCurrentTokens(clisrv_token_struct **curr_tokens)
+{
+	printf("freePcmdCurrentTokens: entry\n");
+	/* Recursive freing */
+	if (curr_tokens != NULL) {
+		if (*curr_tokens != NULL) {
+			while ((*curr_tokens)->next != NULL) {
+				freePcmdCurrentTokens(&((*curr_tokens)->next));
+				(*curr_tokens)->next = NULL;
+			}
+			free(*curr_tokens);
+			*curr_tokens = NULL;
+		}
+	}
+}
+
+static clisrv_token_struct * clisrvCheckAndSetCommand(clisrv_token_struct *pcmd_token, clisrv_pconn_struct *pconn)
+{
+	clisrv_token_struct *new;
+
+	if (pcmd_token == NULL)
+		return NULL;
+
+	if (pconn == NULL)
+		return NULL;
+
+	if (pconn->nr_tokens == 0)
+		return NULL;
+
+	if (strcmp(pcmd_token->strval, pconn->tokens) != 0)
+		return NULL;
+
+	if ((new = (clisrv_token_struct *)calloc(1, sizeof(clisrv_token_struct))) == NULL) {
+		evm_log_system_error("calloc() - clisrv_token_struct: command\n");
+		abort();
+	}
+
+	new->type = CLISRV_CMD;
+	new->strval = pcmd_token->strval;
+	pconnCmdRemoveToken(pconn, pconn->tokens);
+
+	return new;
+}
+
+static clisrv_token_struct * clisrvCheckAndSetArgument(clisrv_token_struct *pcmd_token, clisrv_pconn_struct *pconn, clisrv_token_struct *curr_tokens)
+{
+	clisrv_token_struct *last;
+	char *token, *eq;
+	int i;
+
+	if (pcmd_token == NULL)
+		return NULL;
+
+	if (curr_tokens == NULL)
+		return NULL;
+
+	if (pconn == NULL)
+		return NULL;
+
+	if (pcmd_token->opti <= pcmd_token->mand)
+		if (pconn->nr_tokens == 0)
+			return NULL;
+
+	last = curr_tokens;
+	while (last->next != NULL) {
+		last = last->next;
+	}
+
+	i = pconn->nr_tokens;
+	token = pconn->tokens;
+	while (i > 0) {
+		if (strncmp(token, pcmd_token->strval, strlen(pcmd_token->strval)) == 0) {
+
+			if ((last->next = (clisrv_token_struct *)calloc(1, sizeof(clisrv_token_struct))) == NULL) {
+				evm_log_system_error("calloc() - clisrv_token_struct: argument\n");
+				abort();
+			}
+
+			last->next->type = CLISRV_ARG;
+			last->next->strval = pcmd_token->strval;
+			last->next->level = pcmd_token->level;
+			last->next->mand = pcmd_token->mand;
+			last->next->opti = pcmd_token->opti;
+			last->next->altr = pcmd_token->altr;
+			if ((last->next->altr != 0) && (last->next->altr == last->altr)) {
+				/*ERROR: more than one alternative arguments provided*/
+				evm_log_debug("more than one alternative arguments provided\n");
+				freePcmdCurrentTokens(&curr_tokens);
+				return NULL;
+			}
+			if ((eq = strchr(token, '=')) != NULL) {
+				/*argument with value provided*/
+				if ((pcmd_token->next != NULL) && (pcmd_token->next->type == CLISRV_EQUALS)) {
+					if ((pcmd_token->next->next != NULL) && (pcmd_token->next->next->type == CLISRV_VAL)) {
+						eq++;
+						if (strlen(eq) < 100) {
+							strncpy(last->next->eqval, eq, 100);
+						} else {
+							/*ERROR: value string too long*/
+							evm_log_debug("argument value string too long\n");
+							freePcmdCurrentTokens(&curr_tokens);
+							return NULL;
+						}
+					} else {
+						/*ERROR: value required, but value specification missing*/
+						evm_log_debug("argument value required, but value specification missing\n");
+						freePcmdCurrentTokens(&curr_tokens);
+						return NULL;
+					}
+				} else {
+					/*ERROR: value not required, but provided*/
+					evm_log_debug("argument value provided, but none required\n");
+					freePcmdCurrentTokens(&curr_tokens);
+					return NULL;
+				}
+			} else {
+				/*argument without provided value*/
+				if ((pcmd_token->next != NULL) && (pcmd_token->next->type == CLISRV_EQUALS)) {
+					/*ERROR: value required, but none provided*/
+					evm_log_debug("argument value required, but none provided\n");
+					freePcmdCurrentTokens(&curr_tokens);
+					return NULL;
+				}
+				last->next->eqval[0] = '\0';
+			}
+			pconnCmdRemoveToken(pconn, token);
+			break;
+		}
+		i--;
+		token += (strlen(token) + 1);
+	}
+
+	return curr_tokens;
+}
+
+clisrv_token_struct * checkSyntaxAndSetValues(clisrv_cmd_struct *this, clisrv_pconn_struct *pconn)
+{
+	clisrv_token_struct *pcmd_token;
+	clisrv_token_struct *curr_tokens;
+
+	if (this == NULL)
+		return NULL;
+
+	if (pconn == NULL)
+		return NULL;
+
+	/* Analyse command token */
+	pcmd_token = this->tokens;
+	if (pcmd_token->type != CLISRV_CMD) {
+		return NULL;
+	}
+	if ((curr_tokens = clisrvCheckAndSetCommand(pcmd_token, pconn)) == NULL) {
+		return NULL;
+	}
+
+	/* Analyse command argument tokens: walk through command specification! */
+	while (U2UP_NET_TRUE) {
+		pcmd_token = pcmd_token->next;
+		if (pcmd_token == NULL) {
+			/* We got through command template! */
+			if (pconn->nr_tokens != 0) {
+				/* pconn tokens remaining: unknown cmd arguments */
+				freePcmdCurrentTokens(&curr_tokens);
+				return NULL;
+			}
+			return curr_tokens;
+		}
+
+		/* Error check - just in case */
+		if (pcmd_token->type == CLISRV_CMD) {
+			evm_log_error("CLISRV_CMD should not be detected here!\n");
+			freePcmdCurrentTokens(&curr_tokens);
+			return NULL;
+		}
+		/* Skip! */
+		if (pcmd_token->type != CLISRV_ARG) {
+			continue;
+		}
+
+		/* mandatory command arguments required, but no more pconn tokens provided */
+		if (pcmd_token->opti <= pcmd_token->mand) {
+			if (pconn->nr_tokens == 0) {
+				/* no more pconn tokens: missing cmd arguments */
+				freePcmdCurrentTokens(&curr_tokens);
+				return NULL;
+			}
+		}
+		/* Still not through command template! */
+		if (pcmd_token->type != CLISRV_ARG) {
+			evm_log_error("Only CLISRV_ARG should be detected here (type=%d)!\n", pcmd_token->type);
+			freePcmdCurrentTokens(&curr_tokens);
+			return NULL;
+		}
+
+		if ((curr_tokens = clisrvCheckAndSetArgument(pcmd_token, pconn, curr_tokens)) == NULL) {
+			return NULL;
+		}
+	}
+
+	return curr_tokens;
+}
+
+static int help_handle(clisrv_token_struct *curr_tokens, char *buff, int size)
 {
 	printf("help command handle called!'\n");
 	clisrv_strncat(buff, "\nPress TAB-TAB to display all available commands.\n", size);
@@ -177,46 +436,48 @@ static int help_handle(clisrv_cmd_struct *this, clisrv_pconn_struct *pconn_cmd, 
 	return 0;
 }
 
-static int dump_handle(clisrv_cmd_struct *this, clisrv_pconn_struct *pconn_cmd, char *buff, int size)
+static int dump_handle(clisrv_token_struct *curr_tokens, char *buff, int size)
 {
 	printf("dump command handle called!'\n");
+
 	u2up_dump_u2up_net_ring(buff, size);
+	freePcmdCurrentTokens(&curr_tokens);
 
 	return 0;
 }
 
-static int disable_handle(clisrv_cmd_struct *this, clisrv_pconn_struct *pconn_cmd, char *buff, int size)
+static int disable_handle(clisrv_token_struct *curr_tokens, char *buff, int size)
 {
 	printf("disable command handle called!'\n");
 	return 0;
 }
 
-static int enable_handle(clisrv_cmd_struct *this, clisrv_pconn_struct *pconn_cmd, char *buff, int size)
+static int enable_handle(clisrv_token_struct *curr_tokens, char *buff, int size)
 {
 	printf("enable command handle called!'\n");
 	return 0;
 }
 
-static int quit_handle(clisrv_cmd_struct *this, clisrv_pconn_struct *pconn_cmd, char *buff, int size)
+static int quit_handle(clisrv_token_struct *curr_tokens, char *buff, int size)
 {
 	printf("quit command handle called!'\n");
 	return 127;
 }
 
 #if 1 /*test*/
-static int test1_handle(clisrv_cmd_struct *this, clisrv_pconn_struct *pconn_cmd, char *buff, int size)
+static int test1_handle(clisrv_token_struct *curr_tokens, char *buff, int size)
 {
 	printf("test1 command handle called!'\n");
 	return 0;
 }
 
-static int test2_handle(clisrv_cmd_struct *this, clisrv_pconn_struct *pconn_cmd, char *buff, int size)
+static int test2_handle(clisrv_token_struct *curr_tokens, char *buff, int size)
 {
 	printf("test2 command handle called!'\n");
 	return 0;
 }
 
-static int test3_handle(clisrv_cmd_struct *this, clisrv_pconn_struct *pconn_cmd, char *buff, int size)
+static int test3_handle(clisrv_token_struct *curr_tokens, char *buff, int size)
 {
 	printf("test3 command handle called!'\n");
 	return 0;
@@ -295,7 +556,11 @@ static char * squeezeStrIfNext(char *str, char c)
 static clisrv_token_struct * tokenizeCmdStr(clisrv_cmd_struct *clicmd)
 {
 	char *tmp;
-	int cub, sqb;
+	int level = 0;
+	int mand = 0;
+	int opti = 0;
+	int altr = 0;
+	int altr_last = 0;
 	int token_on;
 	clisrv_token_struct *new;
 	clisrv_token_struct *base = NULL;
@@ -311,13 +576,12 @@ static clisrv_token_struct * tokenizeCmdStr(clisrv_cmd_struct *clicmd)
 	evm_log_debug("tokenizeCmdStr clicmd->cmd: %s\n", clicmd->cmd);
 
 	tmp = clicmd->cmd;
-	sqb = 0;
-	cub = 0;
 	token_on = U2UP_NET_FALSE;
 	while (*tmp != '\0') {
 		evm_log_debug("tokenizeCmdStr tmp: %s\n", tmp);
 		if (*tmp == '{') {
-			cub++;
+			level++;
+			mand = level;
 			if ((new = (clisrv_token_struct *)calloc(1, sizeof(clisrv_token_struct))) == NULL) {
 				evm_log_system_error("calloc() - clisrv_token_struct: left curly bracket\n");
 				abort();
@@ -326,14 +590,20 @@ static clisrv_token_struct * tokenizeCmdStr(clisrv_cmd_struct *clicmd)
 			new->base = current;
 			new->type = CLISRV_CURLY_L;
 			evm_log_debug("tokenizeCmdStr new->type: %d\n", new->type);
-			new->sqb = current->sqb;
-			new->cub = cub;
+			new->level = level;
+			new->mand = mand;
+			new->opti = opti;
+			new->altr = altr;
 
 			current = new;
 		}
 		if (*tmp == '}') {
-			cub--;
-			if (cub < 0) {
+			level--;
+			mand = level;
+			if (altr > 0)
+				altr_last = altr;
+			altr = 0;
+			if (level < 0) {
 				evm_log_error("Syntax error - curly brackets: more rights then lefts\n");
 				abort();
 			}
@@ -345,8 +615,10 @@ static clisrv_token_struct * tokenizeCmdStr(clisrv_cmd_struct *clicmd)
 			new->base = current;
 			new->type = CLISRV_CURLY_R;
 			evm_log_debug("tokenizeCmdStr new->type: %d\n", new->type);
-			new->sqb = current->sqb;
-			new->cub = cub;
+			new->level = level;
+			new->mand = mand;
+			new->opti = opti;
+			new->altr = altr;
 			curr_base = current->base;
 			while (curr_base->type != CLISRV_CURLY_L) {
 				curr_base = curr_base->base;
@@ -358,7 +630,7 @@ static clisrv_token_struct * tokenizeCmdStr(clisrv_cmd_struct *clicmd)
 				abort();
 			}
 			new->base = curr_base;
-			if (new->cub != (new->base->cub - 1)) {
+			if (new->level != (new->base->level - 1)) {
 				evm_log_error("Syntax error - curly brackets: left not matched\n");
 				abort();
 			}
@@ -366,7 +638,8 @@ static clisrv_token_struct * tokenizeCmdStr(clisrv_cmd_struct *clicmd)
 			current = new;
 		}
 		if (*tmp == '[') {
-			sqb++;
+			level++;
+			opti = level;
 			if ((new = (clisrv_token_struct *)calloc(1, sizeof(clisrv_token_struct))) == NULL) {
 				evm_log_system_error("calloc() - clisrv_token_struct: left square bracket\n");
 				abort();
@@ -375,14 +648,20 @@ static clisrv_token_struct * tokenizeCmdStr(clisrv_cmd_struct *clicmd)
 			new->base = current;
 			new->type = CLISRV_SQUARE_L;
 			evm_log_debug("tokenizeCmdStr new->type: %d\n", new->type);
-			new->cub = current->cub;
-			new->sqb = sqb;
+			new->level = level;
+			new->mand = mand;
+			new->opti = opti;
+			new->altr = altr;
 
 			current = new;
 		}
 		if (*tmp == ']') {
-			sqb--;
-			if (sqb < 0) {
+			level--;
+			opti = level;
+			if (altr > 0)
+				altr_last = altr;
+			altr = 0;
+			if (level < 0) {
 				evm_log_error("Syntax error - square brackets: more rights then lefts\n");
 				abort();
 			}
@@ -394,8 +673,10 @@ static clisrv_token_struct * tokenizeCmdStr(clisrv_cmd_struct *clicmd)
 			new->base = current;
 			new->type = CLISRV_SQUARE_R;
 			evm_log_debug("tokenizeCmdStr new->type: %d\n", new->type);
-			new->cub = current->cub;
-			new->sqb = sqb;
+			new->level = level;
+			new->mand = mand;
+			new->opti = opti;
+			new->altr = altr;
 			curr_base = current->base;
 			while (curr_base->type != CLISRV_SQUARE_L) {
 				curr_base = curr_base->base;
@@ -407,7 +688,7 @@ static clisrv_token_struct * tokenizeCmdStr(clisrv_cmd_struct *clicmd)
 				abort();
 			}
 			new->base = curr_base;
-			if (new->sqb != (new->base->sqb - 1)) {
+			if (new->level != (new->base->level - 1)) {
 				evm_log_error("Syntax error - square brackets: left not matched\n");
 				abort();
 			}
@@ -415,15 +696,21 @@ static clisrv_token_struct * tokenizeCmdStr(clisrv_cmd_struct *clicmd)
 			current = new;
 		}
 		if (*tmp == '|') {
+			if (altr == 0) {
+				altr = altr_last + 1;
+			}
 			if ((new = (clisrv_token_struct *)calloc(1, sizeof(clisrv_token_struct))) == NULL) {
 				evm_log_system_error("calloc() - clisrv_token_struct: vertbar\n");
 				abort();
 			}
 			current->next = new;
+			current->altr = altr;
 			new->type = CLISRV_VERTBAR;
 			evm_log_debug("tokenizeCmdStr new->type: %d\n", new->type);
-			new->cub = current->cub;
-			new->sqb = current->sqb;
+			new->level = level;
+			new->mand = mand;
+			new->opti = opti;
+			new->altr = altr;
 			curr_base = current;
 			do {
 				curr_base = curr_base->base;
@@ -452,8 +739,10 @@ static clisrv_token_struct * tokenizeCmdStr(clisrv_cmd_struct *clicmd)
 			current->next = new;
 			new->type = CLISRV_EQUALS;
 			evm_log_debug("tokenizeCmdStr new->type: %d\n", new->type);
-			new->cub = current->cub;
-			new->sqb = current->sqb;
+			new->level = level;
+			new->mand = mand;
+			new->opti = opti;
+			new->altr = altr;
 			new->base = current;
 			if (new->base->type != CLISRV_ARG) {
 				evm_log_error("Syntax error - equals\n");
@@ -492,11 +781,20 @@ static clisrv_token_struct * tokenizeCmdStr(clisrv_cmd_struct *clicmd)
 					if (new->base->type != CLISRV_EQUALS) {
 						new->type = CLISRV_ARG;
 						evm_log_debug("tokenizeCmdStr new->type: %d\n", new->type);
+						if (new->base->type != CLISRV_VERTBAR) {
+							if (altr > 0)
+								altr_last = altr;
+							altr = 0;
+						}
 					} else {
 						new->type = CLISRV_VAL;
 						evm_log_debug("tokenizeCmdStr new->type: %d\n", new->type);
 					}
 				}
+				new->level = level;
+				new->mand = mand;
+				new->opti = opti;
+				new->altr = altr;
 				new->strval = tmp;
 				evm_log_debug("tokenizeCmdStr new->strval: %s\n", new->strval);
 
@@ -519,7 +817,6 @@ static clisrv_cmd_struct * tokenizeCliCmd(char *clicmd)
 		return NULL;
 	}
 
-	printf("tokenize cmd: %s\n", clicmd);
 	if ((tmp = (clisrv_cmd_struct *)calloc(1, sizeof(clisrv_cmd_struct))) == NULL) {
 		evm_log_system_error("calloc() - clisrv_cmd_struct\n");
 		return NULL;
@@ -537,8 +834,9 @@ static clisrv_cmd_struct * tokenizeCliCmd(char *clicmd)
 #if 1 /*test init result*/
 	{
 		clisrv_token_struct *token = tmp->tokens;
-		printf("cmd tokens: ");
+		printf("pcmd tokens:\n");
 		while (token != NULL) {
+#if 0
 			if (
 				(token->type == CLISRV_CMD) ||
 				(token->type == CLISRV_ARG) ||
@@ -546,6 +844,46 @@ static clisrv_cmd_struct * tokenizeCliCmd(char *clicmd)
 			   ) {
 				printf("%s ", token->strval);
 			}
+#else
+			printf("tokenize cmd: %s\n", clicmd);
+			switch (token->type) {
+			case CLISRV_CMD:
+				printf("COMMAND:\n");
+				break;
+			case CLISRV_ARG:
+				printf("ARGUMENT NAME:\n");
+				break;
+			case CLISRV_VAL:
+				printf("ARGUMENT VALUE:\n");
+				break;
+			case CLISRV_EQUALS:
+				printf("EQUALS:\n");
+				break;
+			case CLISRV_SQUARE_L:
+				printf("OPTIONALY BEGIN:\n");
+				break;
+			case CLISRV_SQUARE_R:
+				printf("OPTIONALY END:\n");
+				break;
+			case CLISRV_CURLY_L:
+				printf("MANDATORY BEGIN:\n");
+				break;
+			case CLISRV_CURLY_R:
+				printf("MANDATORY END:\n");
+				break;
+			case CLISRV_VERTBAR:
+				printf("VERTBAR:\n");
+				break;
+			}
+			printf("(%p) '%s'\n", token, token->strval);
+			printf(" base=%p\n", token->base);
+			printf(" next=%p\n", token->next);
+			printf(" level=%d\n", token->level);
+			printf(" mand=%d\n", token->mand);
+			printf(" opti=%d\n", token->opti);
+			printf(" altr=%d\n", token->altr);
+			printf("\n");
+#endif
 			token = token->next;
 		}
 		printf("\n");
@@ -1060,6 +1398,7 @@ static int execCliCmdsTokens(clisrv_cmds_struct *pcmds, clisrv_pconn_struct *pco
 	char *token;
 	char *strval;
 	clisrv_cmd_struct *pcmd;
+	clisrv_token_struct *curr_tokens;
 	evm_log_info("(entry)\n");
 
 	if (pcmds == NULL) {
@@ -1097,7 +1436,15 @@ static int execCliCmdsTokens(clisrv_cmds_struct *pcmds, clisrv_pconn_struct *pco
 		return -2;
 	}
 
-	return pcmd->cmd_handle(pcmd, pconn, buff, size);
+	if ((curr_tokens = checkSyntaxAndSetValues(pcmd, pconn)) == NULL) {
+		if (pconn->nr_tokens == 0)
+			clisrv_strncat(buff, "Missing command arguments!\n", CLISRV_MAX_MSGSZ);
+		else
+			clisrv_strncat(buff, "Unknown command arguments!\n", CLISRV_MAX_MSGSZ);
+		return -3;
+	}
+
+	return pcmd->cmd_handle(curr_tokens, buff, size);
 }
 
 static int execCmdLine(clisrv_pconn_struct *pconn)
@@ -1114,7 +1461,7 @@ static int execCmdLine(clisrv_pconn_struct *pconn)
 	}
 
 	if ((rv = execCliCmdsTokens(clisrv_pcmds, pconn, buff, CLISRV_MAX_MSGSZ)) < 0) {
-		evm_log_error("setCliCmdResponseByTokens() failed\n");
+		evm_log_error("execCliCmdsTokens() failed (rv=%d)\n", rv);
 		switch (rv) {
 		case (-1):
 			clisrv_strncat(buff, "error: invalid execution call (check code)", CLISRV_MAX_MSGSZ);
