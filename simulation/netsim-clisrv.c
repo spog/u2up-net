@@ -426,6 +426,32 @@ clisrv_token_struct * checkSyntaxAndSetValues(clisrv_cmd_struct *this, clisrv_pc
 	return curr_tokens;
 }
 
+static clisrv_token_struct * getCurrentToken(clisrv_token_struct *curr_tokens, char *strval)
+{
+	clisrv_token_struct *curr_token;
+
+	if (curr_tokens == NULL)
+		return NULL;
+
+	if (strval == NULL)
+		return NULL;
+
+	if (strlen(strval) == 0)
+		return NULL;
+
+	curr_token = curr_tokens;
+	while (curr_token != NULL) {
+		if ((curr_token->strval != NULL) && (strlen(curr_token->strval) > 0)) {
+			if (strcmp(curr_token->strval, strval) == 0) {
+				break;
+			}
+		}
+		curr_token = curr_token->next;
+	}
+
+	return curr_token;
+}
+
 static int help_handle(clisrv_token_struct *curr_tokens, char *buff, int size)
 {
 	printf("help command handle called!'\n");
@@ -438,6 +464,14 @@ static int help_handle(clisrv_token_struct *curr_tokens, char *buff, int size)
 
 static int dump_handle(clisrv_token_struct *curr_tokens, char *buff, int size)
 {
+	clisrv_token_struct *prefix_token;
+
+	if ((prefix_token = getCurrentToken(curr_tokens, "prefix")) != NULL) {
+		if ((prefix_token->eqval != NULL) && (strlen(prefix_token->eqval) > 0)) {
+			set_dump_filename_prefix(prefix_token->eqval);
+		}
+	}
+
 	printf("dump command handle called!'\n");
 
 	u2up_dump_u2up_net_ring(buff, size);

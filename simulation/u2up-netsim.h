@@ -82,6 +82,7 @@ typedef struct u2up_net_ring_head {
 	u2upNetRingAddrStruct *first;
 } u2upNetRingHeadStruct;
 
+int set_dump_filename_prefix(char *prefix);
 int u2up_dump_u2up_net_ring(char *buff, int size);
 
 #endif /*U2UP_NET_FILE_u2up_netsim_h*/

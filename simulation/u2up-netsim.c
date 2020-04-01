@@ -67,6 +67,7 @@ unsigned int batch_nodes = 1;
 unsigned int max_nodes = 10;
 static char *default_outfile = "./u2up-net-ring";
 static char *outfile = NULL;
+static char *start_time = NULL;
 static struct tm start;
 
 static void usage_help(char *argv[])
@@ -199,11 +200,14 @@ static int usage_check(int argc, char *argv[])
 	}
 
 	if (outfile == NULL)
-		asprintf(&outfile, "%s_%.4d-%.2d-%.2d-%.2d%.2d", default_outfile, start.tm_year + 1900, start.tm_mon + 1, start.tm_mday, start.tm_hour, start.tm_min);
+		asprintf(&outfile, "%s", default_outfile);
+	if (start_time == NULL)
+		asprintf(&start_time, "%.4d-%.2d-%.2d-%.2d%.2d", start.tm_year + 1900, start.tm_mon + 1, start.tm_mday, start.tm_hour, start.tm_min);
 
 	printf("batch_nodes = %u\n", batch_nodes);
 	printf("max_nodes = %u\n", max_nodes);
 	printf("outfile = %s\n", outfile);
+	printf("start_time = %s\n", start_time);
 	return 0;
 }
 
@@ -609,6 +613,16 @@ static u2upNetRingAddrStruct * generateNewNetAddr(u2upNetRingHeadStruct *ring)
 	return tmp;
 }
 
+int set_dump_filename_prefix(char *prefix)
+{
+	if (outfile != NULL)
+		free(outfile);
+
+	asprintf(&outfile, "%s", prefix);
+
+	return 0;
+}
+
 static unsigned int secs = 0;
 int dump_u2up_net_ring(u2upNetRingHeadStruct *ring, char *buff, int size)
 {
@@ -620,7 +634,7 @@ int dump_u2up_net_ring(u2upNetRingHeadStruct *ring, char *buff, int size)
 	if (ring == NULL)
 		abort();
 
-	asprintf(&pathname, "%s_%.8u.gv", outfile, secs);
+	asprintf(&pathname, "%s_%s_%.8u.gv", outfile, start_time, secs);
 	evm_log_notice("(Write file: %s)\n", pathname);
 	if (buff != NULL) {
 		snprintf(buff, size, "Dump u2upNet to: '%s'", pathname);
