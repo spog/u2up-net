@@ -112,6 +112,7 @@ struct clisrv_token {
 	int opti;
 	int altr;
 	char *strval;
+	char *eqspec;
 	char eqval[100];
 };
 
@@ -135,10 +136,10 @@ static clisrv_cmds_struct *clisrv_pcmds;
 static char *clisrv_cmds[] = {
 	"help",
 	"dump [prefix=%s]",
-	"disable addr=%.8x",
-	"enable {all | addr=%.8x | id=%u}",
+	"disable {addr=%8x | id=%u}",
+	"enable {all | addr=%8x | id=%u}",
 	"quit",
-#if 1 /*test*/
+#if 0 /*test*/
 	"test1 {a|b c|d}",
 	"test2 {a} {b} {c}",
 	"test3 {a=%d | b|c}|{d | e}",
@@ -163,7 +164,7 @@ static int (*cmd_handle[])(clisrv_token_struct *curr_tokens, char *buff, int siz
 	disable_handle,
 	enable_handle,
 	quit_handle,
-#if 1 /*test*/
+#if 0 /*test*/
 	test1_handle,
 	test2_handle,
 	test3_handle,
@@ -208,7 +209,7 @@ static int pconnCmdRemoveToken(clisrv_pconn_struct *pconn, char *token)
 	}
 	pconn->nr_tokens--;
 #if 1
-	printf("1 - pconn->nr_tokens=%d: ", pconn->nr_tokens);
+	printf("2 - pconn->nr_tokens=%d: ", pconn->nr_tokens);
 	{
 		int rv = 0;
 		char *cmd_token = pconn->tokens;
@@ -283,14 +284,45 @@ static clisrv_token_struct * clisrvCheckAndSetArgument(clisrv_token_struct *pcmd
 	if (pconn == NULL)
 		return NULL;
 
+#if 0
 	if (pcmd_token->opti <= pcmd_token->mand)
 		if (pconn->nr_tokens == 0)
 			return NULL;
+#endif
+#if 0
+	printf("(pcmd_token=%p) '%s'\n", pcmd_token, pcmd_token->strval);
+	printf(" level=%d\n", pcmd_token->level);
+	printf(" mand=%d\n", pcmd_token->mand);
+	printf(" opti=%d\n", pcmd_token->opti);
+	printf(" altr=%d\n", pcmd_token->altr);
+	printf("\n");
+#endif
 
 	last = curr_tokens;
 	while (last->next != NULL) {
 		last = last->next;
 	}
+
+#if 0
+	printf("(last=%p) '%s'\n", last, last->strval);
+	printf(" level=%d\n", last->level);
+	printf(" mand=%d\n", last->mand);
+	printf(" opti=%d\n", last->opti);
+	printf(" altr=%d\n", last->altr);
+	printf("\n");
+#endif
+#if 1
+	if (pconn->nr_tokens == 0) {
+		if ((pcmd_token->opti <= pcmd_token->mand) && (pcmd_token->altr == 0)) {
+//	if ((last->opti <= last->mand) && (last->altr == 0)) {
+//		if (pconn->nr_tokens == 0) {
+			/*ERROR: mandatory command arguments required, but no more pconn tokens provided */
+			printf("mandatory command arguments required, but no more pconn tokens provided\n");
+			evm_log_debug("mandatory command arguments required, but no more pconn tokens provided\n");
+			return NULL;
+		}
+	}
+#endif
 
 	i = pconn->nr_tokens;
 	token = pconn->tokens;
@@ -318,6 +350,8 @@ static clisrv_token_struct * clisrvCheckAndSetArgument(clisrv_token_struct *pcmd
 				/*argument with value provided*/
 				if ((pcmd_token->next != NULL) && (pcmd_token->next->type == CLISRV_EQUALS)) {
 					if ((pcmd_token->next->next != NULL) && (pcmd_token->next->next->type == CLISRV_VAL)) {
+						last->next->altr = pcmd_token->next->next->altr;
+						last->next->eqspec = pcmd_token->next->next->strval;
 						eq++;
 						if (strlen(eq) < 100) {
 							strncpy(last->next->eqval, eq, 100);
@@ -403,6 +437,7 @@ clisrv_token_struct * checkSyntaxAndSetValues(clisrv_cmd_struct *this, clisrv_pc
 			continue;
 		}
 
+#if 0
 		/* mandatory command arguments required, but no more pconn tokens provided */
 		if (pcmd_token->opti <= pcmd_token->mand) {
 			if (pconn->nr_tokens == 0) {
@@ -411,6 +446,7 @@ clisrv_token_struct * checkSyntaxAndSetValues(clisrv_cmd_struct *this, clisrv_pc
 				return NULL;
 			}
 		}
+#endif
 		/* Still not through command template! */
 		if (pcmd_token->type != CLISRV_ARG) {
 			evm_log_error("Only CLISRV_ARG should be detected here (type=%d)!\n", pcmd_token->type);
@@ -482,7 +518,33 @@ static int dump_handle(clisrv_token_struct *curr_tokens, char *buff, int size)
 
 static int disable_handle(clisrv_token_struct *curr_tokens, char *buff, int size)
 {
-	printf("disable command handle called!'\n");
+	clisrv_token_struct *addr_token;
+	clisrv_token_struct *id_token;
+	uint32_t addr;
+	unsigned int id;
+
+	if ((addr_token = getCurrentToken(curr_tokens, "addr")) != NULL) {
+		if ((addr_token->eqval != NULL) && (strlen(addr_token->eqval) > 0)) {
+			sscanf(addr_token->eqval, addr_token->eqspec, &addr);
+		}
+		printf("disable command handle called (addr=%8x)!'\n", addr);
+		if (getNodeIdByAddr(addr, &id) != 0) {
+			clisrv_strncat(buff, "error: node id by addr not found", size);
+			return 0;
+		}
+	} else
+	if ((id_token = getCurrentToken(curr_tokens, "id")) != NULL) {
+		if ((id_token->eqval != NULL) && (strlen(id_token->eqval) > 0)) {
+			sscanf(id_token->eqval, id_token->eqspec, &id);
+		}
+		printf("disable command handle called (id=%u)!'\n", id);
+		if (getNodeFirstAddrById(id, &addr) != 0) {
+			clisrv_strncat(buff, "error: node addr by id not found", size);
+			return 0;
+		}
+	}
+
+	printf("disable command handle called (addr=%8x, id=%u)!'\n", addr, id);
 	return 0;
 }
 
@@ -995,6 +1057,9 @@ static int tokenizeCmdLine(clisrv_pconn_struct *pconn)
 	pconn->tokens = tmp;
 	pconn->nr_tokens = 0;
 	while (*tmp != '\0') {
+#if 0
+		printf("tmp='%s'\n", tmp);
+#endif
 		switch (*tmp) {
 		case ' ':
 		case ',':
@@ -1024,9 +1089,28 @@ static int tokenizeCmdLine(clisrv_pconn_struct *pconn)
 						}
 					}
 				} while (squeeze == U2UP_NET_TRUE);
-				*tmp = '\0';
-				if ((tmp > pconn->tokens) && (*(tmp - 1) != '\0')) 
-					pconn->nr_tokens++;
+#if 0
+				printf("tmp:'%s'\n", tmp);
+#endif
+				if (*(tmp + 1) == '=') {
+					*tmp = '=';
+					squeezeStrIfNext(tmp, *(tmp + 1));
+					switch (*(tmp + 1)) {
+					case ' ':
+					case '\t':
+						squeezeStrIfNext(tmp, *(tmp + 1));
+					}
+				} else if (*(tmp - 1) == '=') {
+					switch (*tmp) {
+					case ' ':
+					case '\t':
+						squeezeStrIfNext((tmp - 1), *tmp);
+					}
+				} else {
+					*tmp = '\0';
+					if ((tmp > pconn->tokens) && (*(tmp - 1) != '\0'))
+						pconn->nr_tokens++;
+				}
 			}
 		}
 		tmp++;

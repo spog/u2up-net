@@ -84,5 +84,7 @@ typedef struct u2up_net_ring_head {
 
 int set_dump_filename_prefix(char *prefix);
 int u2up_dump_u2up_net_ring(char *buff, int size);
+int getNodeIdByAddr(uint32_t addr, unsigned int *id);
+int getNodeFirstAddrById(unsigned int id, uint32_t *addr);
 
 #endif /*U2UP_NET_FILE_u2up_netsim_h*/

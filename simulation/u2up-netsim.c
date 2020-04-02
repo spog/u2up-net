@@ -688,6 +688,54 @@ int u2up_dump_u2up_net_ring(char *buff, int size)
 	return 0;
 }
 
+int getNodeFirstAddrById(unsigned int id, uint32_t *addr)
+{
+	u2upNodeOwnCtactStruct *own = NULL;
+
+	if (addr == NULL)
+		return -1;
+
+	pthread_mutex_lock(&simulation_global_mutex);
+	if (id < max_nodes) {
+		if (
+			((own = nodes[id].ctacts) != NULL) &&
+			(own->myself != NULL)
+		   ) {
+			*addr = own->myself->addr;
+			pthread_mutex_unlock(&simulation_global_mutex);
+			return 0;
+		}
+	}
+	pthread_mutex_unlock(&simulation_global_mutex);
+	return -1;
+}
+
+int getNodeIdByAddr(uint32_t addr, unsigned int *id)
+{
+	u2upNodeOwnCtactStruct *own = NULL;
+	int i;
+
+	if (id == NULL)
+		return -1;
+
+	pthread_mutex_lock(&simulation_global_mutex);
+	for (i = 0; i < max_nodes; i++) {
+		/*Check all our own addresses*/
+		if ((own = nodes[i].ctacts) == NULL)
+			break;
+		do {
+			if (addr == own->myself->addr) { /*found existing own address*/
+				pthread_mutex_unlock(&simulation_global_mutex);
+				*id = i;
+				return 0;
+			}
+			own = own->next;
+		} while (own != NULL);
+	}
+	pthread_mutex_unlock(&simulation_global_mutex);
+	return -1;
+}
+
 static int handleTmrAuthBatch(evmConsumerStruct *consumer, evmTimerStruct *tmr)
 {
 	int i;
