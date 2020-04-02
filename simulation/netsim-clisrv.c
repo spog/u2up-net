@@ -529,7 +529,7 @@ static int disable_handle(clisrv_token_struct *curr_tokens, char *buff, int size
 		}
 		printf("disable command handle called (addr=%8x)!'\n", addr);
 		if (getNodeIdByAddr(addr, &id) != 0) {
-			clisrv_strncat(buff, "error: node id by addr not found", size);
+			clisrv_strncat(buff, "error: node id by addr not found!", size);
 			return 0;
 		}
 	} else
@@ -539,12 +539,17 @@ static int disable_handle(clisrv_token_struct *curr_tokens, char *buff, int size
 		}
 		printf("disable command handle called (id=%u)!'\n", id);
 		if (getNodeFirstAddrById(id, &addr) != 0) {
-			clisrv_strncat(buff, "error: node addr by id not found", size);
+			clisrv_strncat(buff, "error: node addr by id not found!", size);
 			return 0;
 		}
 	}
-
 	printf("disable command handle called (addr=%8x, id=%u)!'\n", addr, id);
+
+	if (disableNodeById(id) != 0)
+		snprintf(buff, size, "error: failed to disable node id=%u (addr=%.8x)!", id, addr);
+	else
+		snprintf(buff, size, "disabled node id=%u (addr=%.8x)", id, addr);
+
 	return 0;
 }
 

@@ -65,7 +65,7 @@ unsigned int evmlog_add_header = 1;
 unsigned int auto_dump = 0;
 unsigned int batch_nodes = 1;
 unsigned int max_nodes = 10;
-static char *default_outfile = "./u2up-net-ring";
+static char *default_outfile = "./dump-net-ring";
 static char *outfile = NULL;
 static char *start_time = NULL;
 static struct tm start;
@@ -425,6 +425,11 @@ static int handleTmrProtoRun(evmConsumerStruct *consumer, evmTimerStruct *tmr)
 	if ((node = ownCtact->ownNode) == NULL)
 		return -1;
 
+	if (node->active != U2UP_NET_TRUE) {
+		evm_log_info("(node: %u@%.8u disabled) PROTO RUN ignored\n", ownCtact->myself->id, ownCtact->myself->addr);
+		return -1;
+	}
+
 	evm_log_info("(node: %u@%.8u) PROTO RUN started:\n", ownCtact->myself->id, ownCtact->myself->addr);
 
 #if 1
@@ -434,9 +439,12 @@ static int handleTmrProtoRun(evmConsumerStruct *consumer, evmTimerStruct *tmr)
 
 	pthread_mutex_lock(&node->amtx);
 	tmp = node->ctacts->myself->next;
+	/* got through all contacts of the node */
 	do {
+		/* skip own addresses */
 		if (tmp->own != 1) {
 			req_node = &nodes[tmp->id];
+			/* Until maxCtacts reached search for "random" contacts, afterwards optimize for "nearest" contacts! */
 			if (ownCtact->numCtacts < node->maxCtacts) {
 				send_protocol_random_req_msg(consumer, req_node->ctacts, node->ctacts->myself->id, node->ctacts->myself->addr);
 				ownCtact->sentMsgs++;
@@ -475,6 +483,11 @@ static int evProtocolRandomReqMsg(evmConsumerStruct *consumer, evmMessageStruct 
 	if ((node = ownCtact->ownNode) == NULL)
 		return -1;
 
+	if (node->active != U2UP_NET_TRUE) {
+		evm_log_info("(node: %u@%.8u disabled) RANDOM REQUEST msg ignored\n", ownCtact->myself->id, ownCtact->myself->addr);
+		return -1;
+	}
+
 #if 0
 	/*set protocol timeout to find nearest nodes*/
 	ownCtact->tmrProtoRun = startTmrProtoRun(ownCtact->tmrProtoRun, 1, 0, (void *)ownCtact, tmridProtoRun);
@@ -483,7 +496,7 @@ static int evProtocolRandomReqMsg(evmConsumerStruct *consumer, evmMessageStruct 
 	if ((contact = (u2upNodeRingContactStruct *)evm_message_data_get(msg)) == NULL)
 		return -1;
 
-	evm_log_info("(node: %u@%.8u) NEAR REQUEST msg received: contact: %u@%.8u\n", ownCtact->myself->id, ownCtact->myself->addr, contact->id, contact->addr);
+	evm_log_info("(node: %u@%.8u) RANDOM REQUEST msg received: contact: %u@%.8u\n", ownCtact->myself->id, ownCtact->myself->addr, contact->id, contact->addr);
 
 	insertNodeContact(ownCtact, contact->id, contact->addr);
 
@@ -514,7 +527,7 @@ static int evProtocolRandomReplMsg(evmConsumerStruct *consumer, evmMessageStruct
 	if ((contact = (u2upNodeRingContactStruct *)evm_message_data_get(msg)) == NULL)
 		return -1;
 
-	evm_log_info("(node: %u@%.8u) NEAR REPLY msg received: contact: %u@%.8u\n", ownCtact->myself->id, ownCtact->myself->addr, contact->id, contact->addr);
+	evm_log_info("(node: %u@%.8u) RANDOM REPLY msg received: contact: %u@%.8u\n", ownCtact->myself->id, ownCtact->myself->addr, contact->id, contact->addr);
 
 #if 0 /*spog - orig*/
 	insertRandomAddrContact(ownCtact, contact->id, contact->addr);
@@ -543,6 +556,11 @@ static int evProtocolNearReqMsg(evmConsumerStruct *consumer, evmMessageStruct *m
 
 	if ((node = ownCtact->ownNode) == NULL)
 		return -1;
+
+	if (node->active != U2UP_NET_TRUE) {
+		evm_log_info("(node: %u@%.8u disabled) NEAR REQUEST msg ignored\n", ownCtact->myself->id, ownCtact->myself->addr);
+		return -1;
+	}
 
 #if 0
 	/*set protocol timeout to find nearest nodes*/
@@ -688,6 +706,22 @@ int u2up_dump_u2up_net_ring(char *buff, int size)
 	return 0;
 }
 
+int disableNodeById(unsigned int id)
+{
+	pthread_mutex_lock(&simulation_global_mutex);
+	if (id >= max_nodes) {
+		pthread_mutex_unlock(&simulation_global_mutex);
+		return -1;
+	}
+
+	pthread_mutex_lock(&nodes[id].amtx);
+	nodes[id].active = U2UP_NET_FALSE;
+	pthread_mutex_unlock(&nodes[id].amtx);
+
+	pthread_mutex_unlock(&simulation_global_mutex);
+	return 0;
+}
+
 int getNodeFirstAddrById(unsigned int id, uint32_t *addr)
 {
 	u2upNodeOwnCtactStruct *own = NULL;
@@ -758,6 +792,7 @@ static int handleTmrAuthBatch(evmConsumerStruct *consumer, evmTimerStruct *tmr)
 		for (i = 0; i < batch_nodes; i++) {
 			if (next_node < max_nodes) {
 				ringAddr = generateNewNetAddr(&net_addr_ring);
+				nodes[next_node].active = U2UP_NET_TRUE;
 				nodes[next_node].maxCtacts = 3;
 				nodes[next_node].numOwns = 0;
 				nodes[next_node].consumer = protocol_consumer;

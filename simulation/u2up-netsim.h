@@ -53,6 +53,7 @@ struct u2up_node_ring_contact {
 
 typedef struct u2up_net_node {
 	pthread_mutex_t amtx;
+	int active;
 	unsigned int maxCtacts; /*excluding ownCtacts*/
 	unsigned int numOwns; /*number of own contacts*/
 	u2upNodeOwnCtactStruct *ctacts;
@@ -84,6 +85,7 @@ typedef struct u2up_net_ring_head {
 
 int set_dump_filename_prefix(char *prefix);
 int u2up_dump_u2up_net_ring(char *buff, int size);
+int disableNodeById(unsigned int id);
 int getNodeIdByAddr(uint32_t addr, unsigned int *id);
 int getNodeFirstAddrById(unsigned int id, uint32_t *addr);
 
