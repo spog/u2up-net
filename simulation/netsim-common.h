@@ -62,6 +62,8 @@ EXTERN u2upNodeOwnCtactStruct * newU2upNodeOwnContact(u2upNetNodeStruct *node, u
 EXTERN u2upNodeOwnCtactStruct * insertNodeOwnContact(u2upNetNodeStruct *node, unsigned int id, uint32_t addr);
 EXTERN u2upNodeRingContactStruct * insertNodeContact(u2upNodeOwnCtactStruct *ownCtact, unsigned int id, uint32_t addr);
 EXTERN u2upNodeRingContactStruct * deleteNodeContact(u2upNetNodeStruct *node, uint32_t addr);
+EXTERN u2upNodeRingContactStruct * _retireNodeContact(u2upNetNodeStruct *node, u2upNodeRingContactStruct *ctact);
+EXTERN u2upNodeRingContactStruct * retireNodeContactByAddr(u2upNetNodeStruct *node, uint32_t addr);
 EXTERN u2upNodeRingContactStruct * deleteNodeMyself(u2upNetNodeStruct *node, uint32_t addr);
 EXTERN u2upNodeRingContactStruct * getRandomRemoteContact(u2upNodeOwnCtactStruct *ownCtact);
 EXTERN u2upNodeRingContactStruct * findNearNextContact(u2upNetNodeStruct *node, uint32_t addr);

@@ -57,6 +57,10 @@ typedef struct u2up_net_node {
 	unsigned int maxCtacts; /*excluding ownCtacts*/
 	unsigned int numOwns; /*number of own contacts*/
 	u2upNodeOwnCtactStruct *ctacts;
+	unsigned int maxRetired;
+	unsigned int numRetired;
+	u2upNodeRingContactStruct *retired_old;
+	u2upNodeRingContactStruct *retired_yng;
 	evmConsumerStruct *consumer;
 } u2upNetNodeStruct;
 

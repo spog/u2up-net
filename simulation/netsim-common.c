@@ -373,6 +373,136 @@ u2upNodeRingContactStruct * deleteNodeContact(u2upNetNodeStruct *node, uint32_t 
 	return tmp;
 }
 
+static u2upNodeRingContactStruct * _insertRetiredContact(u2upNetNodeStruct *node, u2upNodeRingContactStruct *ctact)
+{
+	u2upNodeRingContactStruct *tmp = NULL;
+
+	if ((node == NULL) || (ctact == NULL))
+		return NULL;
+
+	ctact->prev = NULL;
+	ctact->next = NULL;
+
+	if (node->retired_old == NULL)
+		if (node->retired_yng != NULL) {
+			node->retired_old = node->retired_yng;
+			node->numRetired = 1;
+		}
+
+	if (node->retired_yng == NULL)
+		if (node->retired_old != NULL) {
+			node->retired_yng = node->retired_old;
+			node->numRetired = 1;
+		}
+
+	if (
+		(node->retired_old == NULL) &&
+		(node->retired_yng == NULL)
+	   ) {
+		node->retired_old = ctact;
+		node->retired_yng = ctact;
+		node->numRetired = 1;
+		return ctact;
+	}
+
+	ctact->next = node->retired_yng;
+	node->retired_yng->prev = ctact;
+	node->retired_yng = ctact;
+	node->numRetired++;
+
+	if (node->numRetired > node->maxRetired) {
+		tmp = node->retired_old;
+		node->retired_old = node->retired_old->prev;
+		node->retired_old->next = NULL;
+		node->numRetired--;
+		free(tmp);
+	}
+
+	return ctact;
+}
+
+u2upNodeRingContactStruct * _retireNodeContact(u2upNetNodeStruct *node, u2upNodeRingContactStruct *ctact)
+{
+	u2upNodeOwnCtactStruct *own = NULL;
+	u2upNodeRingContactStruct *tmp = NULL, *retp = NULL;
+
+	if ((node == NULL) || (node->ctacts == NULL) || (node->ctacts->myself == NULL))
+		return NULL;
+
+	if (ctact == NULL)
+		return NULL;
+
+	own = node->ctacts;
+	if (own == NULL) /*no own addresses yet -> nothing to delete*/
+		return NULL;
+
+	do {
+		if (ctact == own->myself) /*found existing own address - DO NOT TOUCH!*/
+			return NULL;
+		own = own->next;
+	} while (own != NULL);
+
+	tmp = node->ctacts->myself;
+	do {
+		if (tmp == ctact) { /*address found -> RETIRE -> return moved (retired) tmp*/
+			retp = tmp->next;
+			tmp->prev->next = tmp->next;
+			tmp->next->prev = tmp->prev;
+			_insertRetiredContact(node, tmp);
+			return retp;
+		}
+		tmp = tmp->next;
+	} while (tmp != node->ctacts->myself);
+
+	return NULL;
+}
+
+static u2upNodeRingContactStruct * _retireNodeContactByAddr(u2upNetNodeStruct *node, uint32_t addr)
+{
+	u2upNodeOwnCtactStruct *own = NULL;
+	u2upNodeRingContactStruct *tmp = NULL;
+
+	if ((node == NULL) || (node->ctacts == NULL) || (node->ctacts->myself == NULL))
+		return NULL;
+
+	own = node->ctacts;
+	if (own == NULL) /*no own addresses yet -> nothing to delete*/
+		return NULL;
+
+	do {
+		if (addr == own->myself->addr) /*found existing own address - DO NOT REMOVE HERE!*/
+			return NULL;
+		own = own->next;
+	} while (own != NULL);
+
+	tmp = node->ctacts->myself;
+	do {
+		if (tmp->addr == addr) { /*address found -> RETIRE -> return moved (retired) tmp*/
+			tmp->prev->next = tmp->next;
+			tmp->next->prev = tmp->prev;
+			return _insertRetiredContact(node, tmp);
+		}
+		tmp = tmp->next;
+	} while (tmp != node->ctacts->myself);
+
+	return NULL;
+}
+
+u2upNodeRingContactStruct * retireNodeContactByAddr(u2upNetNodeStruct *node, uint32_t addr)
+{
+	u2upNodeRingContactStruct *tmp = NULL;
+
+	if (node == NULL)
+		return NULL;
+
+	pthread_mutex_lock(&node->amtx);
+
+	tmp = _retireNodeContactByAddr(node, addr);
+
+	pthread_mutex_unlock(&node->amtx);
+	return tmp;
+}
+
 u2upNodeRingContactStruct * deleteNodeMyself(u2upNetNodeStruct *node, uint32_t addr)
 {
 	u2upNodeOwnCtactStruct *own = NULL;

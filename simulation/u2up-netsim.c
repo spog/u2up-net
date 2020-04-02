@@ -266,6 +266,13 @@ static evmTimerStruct * startTmrProtoRun(evmTimerStruct *tmr, time_t tv_sec, lon
 	return evm_timer_start(protocol_consumer, tmrid_ptr, tv_sec, tv_nsec, ctx_ptr);
 }
 
+static evmTimerStruct * startTmrWaitReply(evmTimerStruct *tmr, time_t tv_sec, long tv_nsec, void *ctx_ptr, evmTmridStruct *tmrid_ptr)
+{
+	evm_log_info("(entry) tmr=%p, sec=%ld, nsec=%ld, ctx_ptr=%p\n", tmr, tv_sec, tv_nsec, ctx_ptr);
+//here might be a BUG in libevm!!!	evm_timer_stop(tmr);
+	return evm_timer_start(protocol_consumer, tmrid_ptr, tv_sec, tv_nsec, ctx_ptr);
+}
+
 /* Send PROTOCOL messages */
 static int send_protocol_msg(evmConsumerStruct *consumer, evmMsgidStruct *msgid_ptr, u2upNodeOwnCtactStruct *ownCtact, unsigned int id, uint32_t addr)
 {
@@ -708,6 +715,8 @@ int u2up_dump_u2up_net_ring(char *buff, int size)
 
 int disableNodeById(unsigned int id)
 {
+	u2upNodeRingContactStruct *tmp = NULL;
+
 	pthread_mutex_lock(&simulation_global_mutex);
 	if (id >= max_nodes) {
 		pthread_mutex_unlock(&simulation_global_mutex);
@@ -716,6 +725,15 @@ int disableNodeById(unsigned int id)
 
 	pthread_mutex_lock(&nodes[id].amtx);
 	nodes[id].active = U2UP_NET_FALSE;
+	tmp = nodes[id].ctacts->myself->next;
+	/* Retire all remote contacts of the node */
+	do {
+		/* skip own addresses */
+		if (tmp->own != 1) {
+			tmp = _retireNodeContact(&nodes[id], tmp);
+		} else
+			tmp = tmp->next;
+	} while (tmp != nodes[id].ctacts->myself);
 	pthread_mutex_unlock(&nodes[id].amtx);
 
 	pthread_mutex_unlock(&simulation_global_mutex);
@@ -795,6 +813,10 @@ static int handleTmrAuthBatch(evmConsumerStruct *consumer, evmTimerStruct *tmr)
 				nodes[next_node].active = U2UP_NET_TRUE;
 				nodes[next_node].maxCtacts = 3;
 				nodes[next_node].numOwns = 0;
+				nodes[next_node].maxRetired = 2;
+				nodes[next_node].numRetired = 0;
+				nodes[next_node].retired_old = NULL;
+				nodes[next_node].retired_yng = NULL;
 				nodes[next_node].consumer = protocol_consumer;
 				pthread_mutex_init(&nodes[next_node].amtx, NULL);
 				pthread_mutex_unlock(&nodes[next_node].amtx);
