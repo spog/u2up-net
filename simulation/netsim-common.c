@@ -350,6 +350,7 @@ static u2upNodeRingContactStruct * _deleteNodeContact(u2upNetNodeStruct *node, u
 			tmp->prev->next = tmp->next;
 			tmp->next->prev = tmp->prev;
 			free(tmp);
+			node->ctacts->numCtacts--;
 			return tmp;
 		}
 		tmp = tmp->next;
@@ -448,6 +449,7 @@ u2upNodeRingContactStruct * _retireNodeContact(u2upNetNodeStruct *node, u2upNode
 			retp = tmp->next;
 			tmp->prev->next = tmp->next;
 			tmp->next->prev = tmp->prev;
+			node->ctacts->numCtacts--;
 			_insertRetiredContact(node, tmp);
 			return retp;
 		}
@@ -480,6 +482,7 @@ static u2upNodeRingContactStruct * _retireNodeContactByAddr(u2upNetNodeStruct *n
 		if (tmp->addr == addr) { /*address found -> RETIRE -> return moved (retired) tmp*/
 			tmp->prev->next = tmp->next;
 			tmp->next->prev = tmp->prev;
+			node->ctacts->numCtacts--;
 			return _insertRetiredContact(node, tmp);
 		}
 		tmp = tmp->next;

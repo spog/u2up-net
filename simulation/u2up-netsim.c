@@ -248,127 +248,6 @@ static evmMsgidStruct *msgid_random_repl_ptr;
 static evmMsgidStruct *msgid_near_req_ptr;
 static evmMsgidStruct *msgid_near_repl_ptr;
 
-/* Timers */
-static evmTmridStruct *tmridProtoRun;
-static evmTimerStruct *tmrAuthBatch;
-
-static evmTimerStruct * auth_start_timer(evmTimerStruct *tmr, time_t tv_sec, long tv_nsec, void *ctx_ptr, evmTmridStruct *tmrid_ptr)
-{
-	evm_log_info("(entry) tmr=%p, sec=%ld, nsec=%ld, ctx_ptr=%p\n", tmr, tv_sec, tv_nsec, ctx_ptr);
-	evm_timer_stop(tmr);
-	return evm_timer_start(auth_consumer, tmrid_ptr, tv_sec, tv_nsec, ctx_ptr);
-}
-
-static evmTimerStruct * startTmrProtoRun(evmTimerStruct *tmr, time_t tv_sec, long tv_nsec, void *ctx_ptr, evmTmridStruct *tmrid_ptr)
-{
-	evm_log_info("(entry) tmr=%p, sec=%ld, nsec=%ld, ctx_ptr=%p\n", tmr, tv_sec, tv_nsec, ctx_ptr);
-//here might be a BUG in libevm!!!	evm_timer_stop(tmr);
-	return evm_timer_start(protocol_consumer, tmrid_ptr, tv_sec, tv_nsec, ctx_ptr);
-}
-
-static evmTimerStruct * startTmrWaitReply(evmTimerStruct *tmr, time_t tv_sec, long tv_nsec, void *ctx_ptr, evmTmridStruct *tmrid_ptr)
-{
-	evm_log_info("(entry) tmr=%p, sec=%ld, nsec=%ld, ctx_ptr=%p\n", tmr, tv_sec, tv_nsec, ctx_ptr);
-//here might be a BUG in libevm!!!	evm_timer_stop(tmr);
-	return evm_timer_start(protocol_consumer, tmrid_ptr, tv_sec, tv_nsec, ctx_ptr);
-}
-
-/* Send PROTOCOL messages */
-static int send_protocol_msg(evmConsumerStruct *consumer, evmMsgidStruct *msgid_ptr, u2upNodeOwnCtactStruct *ownCtact, unsigned int id, uint32_t addr)
-{
-	evmMessageStruct *msg;
-	u2upNodeRingContactStruct *contact = NULL;
-	evm_log_info("(entry) consumer=%p, msgid_ptr=%p, ownCtact=%p, addr=%u\n", consumer, msgid_ptr, ownCtact, addr);
-
-	if ((consumer == NULL) || (msgid_ptr == NULL) || (ownCtact == NULL))
-		return -1;
-
-	if ((msg = evm_message_new(msgtype_ptr, msgid_ptr, sizeof(u2upNodeRingContactStruct))) == NULL) {
-		evm_log_error("evm_message_new() failed!\n");
-		return -1;
-	}
-
-	if ((contact = (u2upNodeRingContactStruct *)evm_message_data_get(msg)) == NULL) {
-		evm_log_error("evm_message_data_get() failed!\n");
-		return -1;
-	}
-
-	/* Set contact into the message. */
-	contact->id = id;
-	contact->addr = addr;
-	/* Set destination node as context. */
-	evm_message_ctx_set(msg, (void *)ownCtact);
-	/* Send protocom message with contact to another node. */
-	evm_message_pass(consumer, msg);
-
-	return 0;
-}
-
-static int send_protocol_init_msg(evmConsumerStruct *consumer, u2upNodeOwnCtactStruct *ownCtact, unsigned int id, uint32_t addr)
-{
-	evm_log_info("(entry) consumer=%p, ownCtact=%p, addr=%u\n", consumer, ownCtact, addr);
-
-	if ((consumer == NULL) || (ownCtact == NULL))
-		return -1;
-
-	if (send_protocol_msg(consumer, msgid_init_ptr, ownCtact, id, addr) != 0)
-		return -1;
-
-	return 0;
-}
-
-static int send_protocol_random_req_msg(evmConsumerStruct *consumer, u2upNodeOwnCtactStruct *ownCtact, unsigned int id, uint32_t addr)
-{
-	evm_log_info("(entry) consumer=%p, ownCtact=%p, addr=%u\n", consumer, ownCtact, addr);
-
-	if ((consumer == NULL) || (ownCtact == NULL))
-		return -1;
-
-	if (send_protocol_msg(consumer, msgid_random_req_ptr, ownCtact, id, addr) != 0)
-		return -1;
-
-	return 0;
-}
-
-static int send_protocol_random_repl_msg(evmConsumerStruct *consumer, u2upNodeOwnCtactStruct *ownCtact, unsigned int id, uint32_t addr)
-{
-	evm_log_info("(entry) consumer=%p, ownCtact=%p, addr=%u\n", consumer, ownCtact, addr);
-
-	if ((consumer == NULL) || (ownCtact == NULL))
-		return -1;
-
-	if (send_protocol_msg(consumer, msgid_random_repl_ptr, ownCtact, id, addr) != 0)
-		return -1;
-
-	return 0;
-}
-
-static int send_protocol_near_req_msg(evmConsumerStruct *consumer, u2upNodeOwnCtactStruct *ownCtact, unsigned int id, uint32_t addr)
-{
-	evm_log_info("(entry) consumer=%p, ownCtact=%p, addr=%u\n", consumer, ownCtact, addr);
-
-	if ((consumer == NULL) || (ownCtact == NULL))
-		return -1;
-
-	if (send_protocol_msg(consumer, msgid_near_req_ptr, ownCtact, id, addr) != 0)
-		return -1;
-
-	return 0;
-}
-
-static int send_protocol_near_repl_msg(evmConsumerStruct *consumer, u2upNodeOwnCtactStruct *ownCtact, unsigned int id, uint32_t addr)
-{
-	evm_log_info("(entry) consumer=%p, ownCtact=%p, addr=%u\n", consumer, ownCtact, addr);
-
-	if ((consumer == NULL) || (ownCtact == NULL))
-		return -1;
-
-	if (send_protocol_msg(consumer, msgid_near_repl_ptr, ownCtact, id, addr) != 0)
-		return -1;
-
-	return 0;
-}
-
 static u2upNodeOwnCtactStruct * getOwnCtact(unsigned int id, uint32_t addr)
 {
 	u2upNetNodeStruct *node = &nodes[id];
@@ -388,6 +267,150 @@ static u2upNodeOwnCtactStruct * getOwnCtact(unsigned int id, uint32_t addr)
 	return ownCtact;
 }
 
+/* Timers */
+static evmTmridStruct *tmridProtoRun;
+static evmTmridStruct *tmridWaitRepl;
+static evmTimerStruct *tmrAuthBatch;
+
+static evmTimerStruct * auth_start_timer(evmTimerStruct *tmr, time_t tv_sec, long tv_nsec, void *ctx_ptr, evmTmridStruct *tmrid_ptr)
+{
+	evm_log_info("(entry) tmr=%p, sec=%ld, nsec=%ld, ctx_ptr=%p\n", tmr, tv_sec, tv_nsec, ctx_ptr);
+
+	if (evm_timer_stop(tmr) == 0)
+		evm_timer_delete(tmr);
+
+	return evm_timer_start(auth_consumer, tmrid_ptr, tv_sec, tv_nsec, ctx_ptr);
+}
+
+static evmTimerStruct * startTmrProtoRun(evmTimerStruct *tmr, time_t tv_sec, long tv_nsec, void *ctx_ptr, evmTmridStruct *tmrid_ptr)
+{
+	evm_log_info("(entry) tmr=%p, sec=%ld, nsec=%ld, ctx_ptr=%p\n", tmr, tv_sec, tv_nsec, ctx_ptr);
+
+	if (evm_timer_stop(tmr) == 0)
+		evm_timer_delete(tmr);
+
+	return evm_timer_start(protocol_consumer, tmrid_ptr, tv_sec, tv_nsec, ctx_ptr);
+}
+
+/* Send PROTOCOL messages */
+static int send_protocol_msg(evmConsumerStruct *consumer, evmMsgidStruct *msgid_ptr, u2upNodeOwnCtactStruct *destCtact, unsigned int id, uint32_t addr, void *ref)
+{
+	evmMessageStruct *msg;
+	u2upProtocolMsgDataStruct *data = NULL;
+	evm_log_info("(entry) consumer=%p, msgid_ptr=%p, destCtact=%p, from=%u@%.8x\n", consumer, msgid_ptr, destCtact, id, addr);
+
+	if ((consumer == NULL) || (msgid_ptr == NULL) || (destCtact == NULL))
+		return -1;
+
+	if ((msg = evm_message_new(msgtype_ptr, msgid_ptr, sizeof(u2upProtocolMsgDataStruct))) == NULL) {
+		evm_log_error("evm_message_new() failed!\n");
+		return -1;
+	}
+
+	if ((data = (u2upProtocolMsgDataStruct *)evm_message_data_get(msg)) == NULL) {
+		evm_log_error("evm_message_data_get() failed!\n");
+		return -1;
+	}
+
+	/* Set data into the message (data to be used at destination). */
+	data->id = id; /* contact info */
+	data->addr = addr; /* contact info */
+	data->ref = ref; /* link to reply timeout */
+	/* Set destination node as context. */
+	evm_message_ctx_set(msg, (void *)destCtact);
+	/* Send protocom message with contact info to another node. */
+	evm_message_pass(consumer, msg);
+
+	return 0;
+}
+
+static int send_protocol_init_msg(evmConsumerStruct *consumer, u2upNodeOwnCtactStruct *destCtact, unsigned int id, uint32_t addr)
+{
+	evm_log_info("(entry) consumer=%p, destCtact=%p, from=%u@%.8x\n", consumer, destCtact, id, addr);
+
+	if ((consumer == NULL) || (destCtact == NULL))
+		return -1;
+
+	if (send_protocol_msg(consumer, msgid_init_ptr, destCtact, id, addr, NULL) != 0)
+		return -1;
+
+	return 0;
+}
+
+static int send_protocol_random_req_msg(evmConsumerStruct *consumer, u2upNodeOwnCtactStruct *destCtact, unsigned int id, uint32_t addr)
+{
+	evmTimerStruct *tmr;
+	u2upProtocolTmrCtxStruct *tmrCtx;
+	evm_log_info("(entry) consumer=%p, destCtact=%p, from=%u@%.8x\n", consumer, destCtact, id, addr);
+
+	if ((consumer == NULL) || (destCtact == NULL))
+		return -1;
+
+	if ((tmrCtx = (u2upProtocolTmrCtxStruct *)calloc(1, sizeof(u2upProtocolTmrCtxStruct))) == NULL)
+		abort();
+	tmrCtx->src_id = id;
+	tmrCtx->src_addr = addr;
+	tmrCtx->dst_id = destCtact->myself->id;
+	tmrCtx->dst_addr = destCtact->myself->addr;
+
+	tmr = evm_timer_start(protocol_consumer, tmridWaitRepl, /*tv_sec*/ 5, /*tv_nsec*/ 0, (void *)tmrCtx);
+
+	if (send_protocol_msg(consumer, msgid_random_req_ptr, destCtact, id, addr, (void *)tmr) != 0)
+		return -1;
+
+	return 0;
+}
+
+static int send_protocol_random_repl_msg(evmConsumerStruct *consumer, u2upNodeOwnCtactStruct *destCtact, unsigned int id, uint32_t addr, void *ref)
+{
+	evm_log_info("(entry) consumer=%p, destCtact=%p, from=%u@%.8x, ref=%p\n", consumer, destCtact, id, addr, ref);
+
+	if ((consumer == NULL) || (destCtact == NULL))
+		return -1;
+
+	if (send_protocol_msg(consumer, msgid_random_repl_ptr, destCtact, id, addr, ref) != 0)
+		return -1;
+
+	return 0;
+}
+
+static int send_protocol_near_req_msg(evmConsumerStruct *consumer, u2upNodeOwnCtactStruct *destCtact, unsigned int id, uint32_t addr)
+{
+	evmTimerStruct *tmr;
+	u2upProtocolTmrCtxStruct *tmrCtx;
+	evm_log_info("(entry) consumer=%p, destCtact=%p, from=%u@%.8x\n", consumer, destCtact, id, addr);
+
+	if ((consumer == NULL) || (destCtact == NULL))
+		return -1;
+
+	if ((tmrCtx = (u2upProtocolTmrCtxStruct *)calloc(1, sizeof(u2upProtocolTmrCtxStruct))) == NULL)
+		abort();
+	tmrCtx->src_id = id;
+	tmrCtx->src_addr = addr;
+	tmrCtx->dst_id = destCtact->myself->id;
+	tmrCtx->dst_addr = destCtact->myself->addr;
+
+	tmr = evm_timer_start(protocol_consumer, tmridWaitRepl, /*tv_sec*/ 5, /*tv_nsec*/ 0, (void *)tmrCtx);
+
+	if (send_protocol_msg(consumer, msgid_near_req_ptr, destCtact, id, addr, (void *)tmr) != 0)
+		return -1;
+
+	return 0;
+}
+
+static int send_protocol_near_repl_msg(evmConsumerStruct *consumer, u2upNodeOwnCtactStruct *destCtact, unsigned int id, uint32_t addr, void *ref)
+{
+	evm_log_info("(entry) consumer=%p, destCtact=%p, from=%u@%.8x, ref=%p\n", consumer, destCtact, id, addr, ref);
+
+	if ((consumer == NULL) || (destCtact == NULL))
+		return -1;
+
+	if (send_protocol_msg(consumer, msgid_near_repl_ptr, destCtact, id, addr, ref) != 0)
+		return -1;
+
+	return 0;
+}
+
 /* PROTOCOL event handlers */
 static int evProtocolInitMsg(evmConsumerStruct *consumer, evmMessageStruct *msg)
 {
@@ -405,7 +428,7 @@ static int evProtocolInitMsg(evmConsumerStruct *consumer, evmMessageStruct *msg)
 	if ((contact = (u2upNodeRingContactStruct *)evm_message_data_get(msg)) == NULL)
 		return -1;
 
-	evm_log_info("(node: %u@%.8u) INIT msg received: contact: %u@%.8u\n", ownCtact->myself->id, ownCtact->myself->addr, contact->id, contact->addr);
+	evm_log_info("(node: %u@%.8x) INIT msg received: contact: %u@%.8x\n", ownCtact->myself->id, ownCtact->myself->addr, contact->id, contact->addr);
 
 	insertNodeContact(ownCtact, contact->id, contact->addr);
 
@@ -421,7 +444,7 @@ static int evProtocolInitMsg(evmConsumerStruct *consumer, evmMessageStruct *msg)
 
 static int handleTmrProtoRun(evmConsumerStruct *consumer, evmTimerStruct *tmr)
 {
-	u2upNetNodeStruct *node, *req_node;
+	u2upNetNodeStruct *node, *dest_node;
 	u2upNodeOwnCtactStruct *ownCtact;
 	u2upNodeRingContactStruct *tmp = NULL;
 	evm_log_info("(cb entry) tmr=%p\n", tmr);
@@ -433,11 +456,11 @@ static int handleTmrProtoRun(evmConsumerStruct *consumer, evmTimerStruct *tmr)
 		return -1;
 
 	if (node->active != U2UP_NET_TRUE) {
-		evm_log_info("(node: %u@%.8u disabled) PROTO RUN ignored\n", ownCtact->myself->id, ownCtact->myself->addr);
+		evm_log_info("(node: %u@%.8x disabled) PROTO RUN ignored\n", ownCtact->myself->id, ownCtact->myself->addr);
 		return -1;
 	}
 
-	evm_log_info("(node: %u@%.8u) PROTO RUN started:\n", ownCtact->myself->id, ownCtact->myself->addr);
+	evm_log_info("(node: %u@%.8x) PROTO RUN started\n", ownCtact->myself->id, ownCtact->myself->addr);
 
 #if 1
 	/*set protocol timeout to find nearest nodes*/
@@ -450,18 +473,18 @@ static int handleTmrProtoRun(evmConsumerStruct *consumer, evmTimerStruct *tmr)
 	do {
 		/* skip own addresses */
 		if (tmp->own != 1) {
-			req_node = &nodes[tmp->id];
+			dest_node = &nodes[tmp->id];
 			/* Until maxCtacts reached search for "random" contacts, afterwards optimize for "nearest" contacts! */
 			if (ownCtact->numCtacts < node->maxCtacts) {
-				send_protocol_random_req_msg(consumer, req_node->ctacts, node->ctacts->myself->id, node->ctacts->myself->addr);
+				send_protocol_random_req_msg(consumer, dest_node->ctacts, node->ctacts->myself->id, node->ctacts->myself->addr);
 				ownCtact->sentMsgs++;
-				evm_log_info("(node: %u@%.8u) RANDOM REQUEST sent to: %u@%.8u\n",
-						node->ctacts->myself->id, node->ctacts->myself->addr, req_node->ctacts->myself->id, req_node->ctacts->myself->addr);
+				evm_log_info("(node: %u@%.8x) RANDOM REQUEST sent to: %u@%.8x\n",
+						node->ctacts->myself->id, node->ctacts->myself->addr, dest_node->ctacts->myself->id, dest_node->ctacts->myself->addr);
 			} else {
-				send_protocol_near_req_msg(consumer, req_node->ctacts, node->ctacts->myself->id, node->ctacts->myself->addr);
+				send_protocol_near_req_msg(consumer, dest_node->ctacts, node->ctacts->myself->id, node->ctacts->myself->addr);
 				ownCtact->sentMsgs++;
-				evm_log_info("(node: %u@%.8u) NEAR REQUEST sent to: %u@%.8u\n",
-						node->ctacts->myself->id, node->ctacts->myself->addr, req_node->ctacts->myself->id, req_node->ctacts->myself->addr);
+				evm_log_info("(node: %u@%.8x) NEAR REQUEST sent to: %u@%.8x\n",
+						node->ctacts->myself->id, node->ctacts->myself->addr, dest_node->ctacts->myself->id, dest_node->ctacts->myself->addr);
 			}
 		}
 		tmp = tmp->next;
@@ -471,12 +494,34 @@ static int handleTmrProtoRun(evmConsumerStruct *consumer, evmTimerStruct *tmr)
 	return 0;
 }
 
+static int handleTmrWaitRepl(evmConsumerStruct *consumer, evmTimerStruct *tmr)
+{
+	u2upProtocolTmrCtxStruct *tmrCtx;
+	u2upNodeOwnCtactStruct *ownCtact;
+	evm_log_info("(cb entry) tmr=%p\n", tmr);
+
+	if ((tmrCtx = (u2upProtocolTmrCtxStruct *)evm_timer_ctx_get(tmr)) == NULL)
+		return -1;
+
+	evm_log_info(
+		"(node: %u@%.8x) WAIT REPLY (from: %u@%.8x) expired (tmr=%p)\n",
+		tmrCtx->src_id, tmrCtx->src_addr, tmrCtx->dst_id, tmrCtx->dst_addr, tmr
+	);
+
+	if ((ownCtact = getOwnCtact(tmrCtx->src_id, tmrCtx->src_addr)) == NULL)
+		return -1;
+
+	retireNodeContactByAddr(ownCtact->ownNode, tmrCtx->dst_addr);
+
+	return 0;
+}
+
 static int evProtocolRandomReqMsg(evmConsumerStruct *consumer, evmMessageStruct *msg)
 {
 	u2upNetNodeStruct *node;
 	u2upNodeOwnCtactStruct *ownCtact;
 	u2upNodeOwnCtactStruct *repl_ownCtact;
-	u2upNodeRingContactStruct *contact = NULL;
+	u2upProtocolMsgDataStruct *data = NULL;
 	u2upNodeRingContactStruct *random_contact = NULL;
 	evm_log_info("(cb entry) msg=%p\n", msg);
 
@@ -491,7 +536,7 @@ static int evProtocolRandomReqMsg(evmConsumerStruct *consumer, evmMessageStruct 
 		return -1;
 
 	if (node->active != U2UP_NET_TRUE) {
-		evm_log_info("(node: %u@%.8u disabled) RANDOM REQUEST msg ignored\n", ownCtact->myself->id, ownCtact->myself->addr);
+		evm_log_info("(node: %u@%.8x disabled) RANDOM REQUEST msg ignored\n", ownCtact->myself->id, ownCtact->myself->addr);
 		return -1;
 	}
 
@@ -500,18 +545,21 @@ static int evProtocolRandomReqMsg(evmConsumerStruct *consumer, evmMessageStruct 
 	ownCtact->tmrProtoRun = startTmrProtoRun(ownCtact->tmrProtoRun, 1, 0, (void *)ownCtact, tmridProtoRun);
 #endif
 
-	if ((contact = (u2upNodeRingContactStruct *)evm_message_data_get(msg)) == NULL)
+	if ((data = (u2upProtocolMsgDataStruct *)evm_message_data_get(msg)) == NULL)
 		return -1;
 
-	evm_log_info("(node: %u@%.8u) RANDOM REQUEST msg received: contact: %u@%.8u\n", ownCtact->myself->id, ownCtact->myself->addr, contact->id, contact->addr);
+	evm_log_info(
+		"(node: %u@%.8x) RANDOM REQUEST msg received (contact: %u@%.8x, ref=%p)\n",
+		ownCtact->myself->id, ownCtact->myself->addr, data->id, data->addr, data->ref
+	);
 
-	insertNodeContact(ownCtact, contact->id, contact->addr);
+	insertNodeContact(ownCtact, data->id, data->addr);
 
-	if ((repl_ownCtact = getOwnCtact(contact->id, contact->addr)) == NULL)
+	if ((repl_ownCtact = getOwnCtact(data->id, data->addr)) == NULL)
 		return -1;
 
 	if ((random_contact = getRandomRemoteContact(ownCtact)) != NULL) {
-		send_protocol_random_repl_msg(consumer, repl_ownCtact, random_contact->id, random_contact->addr);
+		send_protocol_random_repl_msg(consumer, repl_ownCtact, random_contact->id, random_contact->addr, data->ref);
 		ownCtact->sentMsgs++;
 	}
 
@@ -521,7 +569,7 @@ static int evProtocolRandomReqMsg(evmConsumerStruct *consumer, evmMessageStruct 
 static int evProtocolRandomReplMsg(evmConsumerStruct *consumer, evmMessageStruct *msg)
 {
 	u2upNodeOwnCtactStruct *ownCtact;
-	u2upNodeRingContactStruct *contact = NULL;
+	u2upProtocolMsgDataStruct *data = NULL;
 	evm_log_info("(cb entry) msg=%p\n", msg);
 
 	if ((consumer == NULL) || (msg == NULL))
@@ -531,16 +579,18 @@ static int evProtocolRandomReplMsg(evmConsumerStruct *consumer, evmMessageStruct
 		return -1;
 	ownCtact->recvdMsgs++;
 
-	if ((contact = (u2upNodeRingContactStruct *)evm_message_data_get(msg)) == NULL)
+	if ((data = (u2upProtocolMsgDataStruct *)evm_message_data_get(msg)) == NULL)
 		return -1;
 
-	evm_log_info("(node: %u@%.8u) RANDOM REPLY msg received: contact: %u@%.8u\n", ownCtact->myself->id, ownCtact->myself->addr, contact->id, contact->addr);
+	evm_log_info(
+		"(node: %u@%.8x) RANDOM REPLY msg received: (contact: %u@%.8x, ref=%p)\n",
+		ownCtact->myself->id, ownCtact->myself->addr, data->id, data->addr, data->ref
+	);
 
-#if 0 /*spog - orig*/
-	insertRandomAddrContact(ownCtact, contact->id, contact->addr);
-#else
-	insertNodeContact(ownCtact, contact->id, contact->addr);
-#endif
+	if (evm_timer_stop((evmTimerStruct *)data->ref) == 0)
+		evm_timer_delete((evmTimerStruct *)data->ref);
+
+	insertNodeContact(ownCtact, data->id, data->addr);
 
 	return 0;
 }
@@ -550,7 +600,7 @@ static int evProtocolNearReqMsg(evmConsumerStruct *consumer, evmMessageStruct *m
 	u2upNetNodeStruct *node;
 	u2upNodeOwnCtactStruct *ownCtact;
 	u2upNodeOwnCtactStruct *repl_ownCtact;
-	u2upNodeRingContactStruct *contact = NULL;
+	u2upProtocolMsgDataStruct *data = NULL;
 	u2upNodeRingContactStruct *near_contact = NULL;
 	evm_log_info("(cb entry) msg=%p\n", msg);
 
@@ -565,7 +615,7 @@ static int evProtocolNearReqMsg(evmConsumerStruct *consumer, evmMessageStruct *m
 		return -1;
 
 	if (node->active != U2UP_NET_TRUE) {
-		evm_log_info("(node: %u@%.8u disabled) NEAR REQUEST msg ignored\n", ownCtact->myself->id, ownCtact->myself->addr);
+		evm_log_info("(node: %u@%.8x disabled) NEAR REQUEST msg ignored\n", ownCtact->myself->id, ownCtact->myself->addr);
 		return -1;
 	}
 
@@ -574,22 +624,21 @@ static int evProtocolNearReqMsg(evmConsumerStruct *consumer, evmMessageStruct *m
 	ownCtact->tmrProtoRun = startTmrProtoRun(ownCtact->tmrProtoRun, 1, 0, (void *)ownCtact, tmridProtoRun);
 #endif
 
-	if ((contact = (u2upNodeRingContactStruct *)evm_message_data_get(msg)) == NULL)
+	if ((data = (u2upProtocolMsgDataStruct *)evm_message_data_get(msg)) == NULL)
 		return -1;
 
-	evm_log_info("(node: %u@%.8u) NEAR REQUEST msg received: contact: %u@%.8u\n", ownCtact->myself->id, ownCtact->myself->addr, contact->id, contact->addr);
+	evm_log_info(
+		"(node: %u@%.8x) NEAR REQUEST msg received (contact: %u@%.8x, ref=%p)\n",
+		ownCtact->myself->id, ownCtact->myself->addr, data->id, data->addr, data->ref
+	);
 
-	insertNearAddrContact(ownCtact, contact->id, contact->addr);
+	insertNearAddrContact(ownCtact, data->id, data->addr);
 
-	if ((repl_ownCtact = getOwnCtact(contact->id, contact->addr)) == NULL)
+	if ((repl_ownCtact = getOwnCtact(data->id, data->addr)) == NULL)
 		return -1;
 
-	if ((near_contact = findNearNextContact(node, contact->addr)) != NULL) {
-		send_protocol_near_repl_msg(consumer, repl_ownCtact, near_contact->id, near_contact->addr);
-		ownCtact->sentMsgs++;
-	}
-	if ((near_contact = findNearPrevContact(node, contact->addr)) != NULL) {
-		send_protocol_near_repl_msg(consumer, repl_ownCtact, near_contact->id, near_contact->addr);
+	if ((near_contact = findNearNextContact(node, data->addr)) != NULL) {
+		send_protocol_near_repl_msg(consumer, repl_ownCtact, near_contact->id, near_contact->addr, data->ref);
 		ownCtact->sentMsgs++;
 	}
 
@@ -599,7 +648,7 @@ static int evProtocolNearReqMsg(evmConsumerStruct *consumer, evmMessageStruct *m
 static int evProtocolNearReplMsg(evmConsumerStruct *consumer, evmMessageStruct *msg)
 {
 	u2upNodeOwnCtactStruct *ownCtact;
-	u2upNodeRingContactStruct *contact = NULL;
+	u2upProtocolMsgDataStruct *data = NULL;
 	evm_log_info("(cb entry) msg=%p\n", msg);
 
 	if ((consumer == NULL) || (msg == NULL))
@@ -609,12 +658,18 @@ static int evProtocolNearReplMsg(evmConsumerStruct *consumer, evmMessageStruct *
 		return -1;
 	ownCtact->recvdMsgs++;
 
-	if ((contact = (u2upNodeRingContactStruct *)evm_message_data_get(msg)) == NULL)
+	if ((data = (u2upProtocolMsgDataStruct *)evm_message_data_get(msg)) == NULL)
 		return -1;
 
-	evm_log_info("(node: %u@%.8u) NEAR REPLY msg received: contact: %u@%.8u\n", ownCtact->myself->id, ownCtact->myself->addr, contact->id, contact->addr);
+	evm_log_info(
+		"(node: %u@%.8x) NEAR REPLY msg received: (contact: %u@%.8x, ref=%p)\n",
+		ownCtact->myself->id, ownCtact->myself->addr, data->id, data->addr, data->ref
+	);
 
-	insertNearAddrContact(ownCtact, contact->id, contact->addr);
+	if (evm_timer_stop((evmTimerStruct *)data->ref) == 0)
+		evm_timer_delete((evmTimerStruct *)data->ref);
+
+	insertNearAddrContact(ownCtact, data->id, data->addr);
 
 	return 0;
 }
@@ -811,9 +866,9 @@ static int handleTmrAuthBatch(evmConsumerStruct *consumer, evmTimerStruct *tmr)
 			if (next_node < max_nodes) {
 				ringAddr = generateNewNetAddr(&net_addr_ring);
 				nodes[next_node].active = U2UP_NET_TRUE;
-				nodes[next_node].maxCtacts = 3;
+				nodes[next_node].maxCtacts = 5;
 				nodes[next_node].numOwns = 0;
-				nodes[next_node].maxRetired = 2;
+				nodes[next_node].maxRetired = 4;
 				nodes[next_node].numRetired = 0;
 				nodes[next_node].retired_old = NULL;
 				nodes[next_node].retired_yng = NULL;
@@ -937,12 +992,22 @@ static void * simulation_protocol_run(void *arg)
 
 	consumer = (evmConsumerStruct *)arg;
 
-	/* Prepare NEAR_REQ timer */
-	if ((tmridProtoRun = evm_tmrid_add(evm, TMR_ID_NEAR_REQ)) == NULL) {
+	/* Prepare PROTO_RUN timer */
+	if ((tmridProtoRun = evm_tmrid_add(evm, TMR_ID_PROTO_RUN)) == NULL) {
 		evm_log_error("evm_tmrid_add() failed!\n");
 		abort();
 	}
 	if (evm_tmrid_cb_handle_set(tmridProtoRun, handleTmrProtoRun) < 0) {
+		evm_log_error("evm_tmrid_cb_handle_set() failed!\n");
+		abort();
+	}
+
+	/* Prepare WAIT_REPLY timer */
+	if ((tmridWaitRepl = evm_tmrid_add(evm, TMR_ID_WAIT_REPL)) == NULL) {
+		evm_log_error("evm_tmrid_add() failed!\n");
+		abort();
+	}
+	if (evm_tmrid_cb_handle_set(tmridWaitRepl, handleTmrWaitRepl) < 0) {
 		evm_log_error("evm_tmrid_cb_handle_set() failed!\n");
 		abort();
 	}

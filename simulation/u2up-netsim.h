@@ -43,6 +43,19 @@ struct u2up_node_addr_list {
 	u2upNetAddrListStruct *next;
 }; /*u2upNetAddrListStruct*/
 
+typedef struct u2up_protocol_msg_data {
+	uint32_t addr;
+	unsigned int id;
+	void *ref;
+} u2upProtocolMsgDataStruct;
+
+typedef struct u2up_protocol_tmr_ctx {
+	uint32_t src_addr;
+	unsigned int src_id;
+	uint32_t dst_addr;
+	unsigned int dst_id;
+} u2upProtocolTmrCtxStruct;
+
 struct u2up_node_ring_contact {
 	uint32_t addr;
 	unsigned int id;

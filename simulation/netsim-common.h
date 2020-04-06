@@ -50,7 +50,8 @@ enum evm_msgtype_ids {
 
 enum evm_tmr_ids {
 	TMR_ID_AUTH_BATCH = 0,
-	TMR_ID_NEAR_REQ,
+	TMR_ID_PROTO_RUN,
+	TMR_ID_WAIT_REPL,
 	TMR_ID_CLISRV_CMDTOUT
 };
 
