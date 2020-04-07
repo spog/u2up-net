@@ -239,7 +239,7 @@ static u2upNodeRingContactStruct * _deletePrevContact(u2upNodeOwnCtactStruct *ow
 	return NULL;
 }
 
-u2upNodeRingContactStruct * insertNodeContact(u2upNodeOwnCtactStruct *ownCtact, unsigned int id, uint32_t addr)
+u2upNodeRingContactStruct * _insertNodeContact(u2upNodeOwnCtactStruct *ownCtact, unsigned int id, uint32_t addr)
 {
 	uint32_t uDist2myself, uDist2next, uDist2prev;
 	u2upNetNodeStruct *node = NULL;
@@ -255,15 +255,11 @@ u2upNodeRingContactStruct * insertNodeContact(u2upNodeOwnCtactStruct *ownCtact, 
 	if ((node = ownCtact->ownNode) == NULL)
 		return NULL;
 
-	pthread_mutex_lock(&node->amtx);
-
 	if ((node->ctacts == NULL) || (node->ctacts->myself == NULL)) {
-		pthread_mutex_unlock(&node->amtx);
 		return NULL;
 	}
 
 	if (ownCtact->numCtacts >= node->maxCtacts) {
-		pthread_mutex_unlock(&node->amtx);
 		return NULL;
 	}
 
@@ -271,7 +267,6 @@ u2upNodeRingContactStruct * insertNodeContact(u2upNodeOwnCtactStruct *ownCtact, 
 	own = node->ctacts;
 	do {
 		if (addr == own->myself->addr) { /*found existing own address - FAIL: return NULL*/
-			pthread_mutex_unlock(&node->amtx);
 			return NULL;
 		}
 		own = own->next;
@@ -322,6 +317,22 @@ u2upNodeRingContactStruct * insertNodeContact(u2upNodeOwnCtactStruct *ownCtact, 
 		tmpPrev = tmpPrev->prev;
 	} while (not_done);
 
+	return new;
+}
+
+u2upNodeRingContactStruct * insertNodeContact(u2upNodeOwnCtactStruct *ownCtact, unsigned int id, uint32_t addr)
+{
+	u2upNetNodeStruct *node = NULL;
+	u2upNodeRingContactStruct *new = NULL;
+
+	if (ownCtact == NULL)
+		return NULL;
+
+	if ((node = ownCtact->ownNode) == NULL)
+		return NULL;
+
+	pthread_mutex_lock(&node->amtx);
+	new = _insertNodeContact(ownCtact, id, addr);
 	pthread_mutex_unlock(&node->amtx);
 	return new;
 }

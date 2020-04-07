@@ -61,6 +61,7 @@ EXTERN uint32_t calcUDistance(uint32_t from_addr, uint32_t to_addr);
 EXTERN u2upNodeRingContactStruct * newU2upNodeContact(unsigned int id, uint32_t addr);
 EXTERN u2upNodeOwnCtactStruct * newU2upNodeOwnContact(u2upNetNodeStruct *node, unsigned int id, uint32_t addr);
 EXTERN u2upNodeOwnCtactStruct * insertNodeOwnContact(u2upNetNodeStruct *node, unsigned int id, uint32_t addr);
+EXTERN u2upNodeRingContactStruct * _insertNodeContact(u2upNodeOwnCtactStruct *ownCtact, unsigned int id, uint32_t addr);
 EXTERN u2upNodeRingContactStruct * insertNodeContact(u2upNodeOwnCtactStruct *ownCtact, unsigned int id, uint32_t addr);
 EXTERN u2upNodeRingContactStruct * deleteNodeContact(u2upNetNodeStruct *node, uint32_t addr);
 EXTERN u2upNodeRingContactStruct * _retireNodeContact(u2upNetNodeStruct *node, u2upNodeRingContactStruct *ctact);

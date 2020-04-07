@@ -463,6 +463,11 @@ static int handleTmrProtoRun(evmConsumerStruct *consumer, evmTimerStruct *tmr)
 	if ((node = ownCtact->ownNode) == NULL)
 		return -1;
 
+#if 1
+	/*set protocol timeout to find nearest nodes*/
+	ownCtact->tmrProtoRun = startTmrProtoRun(ownCtact->tmrProtoRun, 1, 0, (void *)ownCtact, tmridProtoRun);
+#endif
+
 	if (node->active != U2UP_NET_TRUE) {
 		evm_log_info("(node: %u@%.8x disabled) PROTO RUN ignored\n", ownCtact->myself->id, ownCtact->myself->addr);
 		return -1;
@@ -470,7 +475,7 @@ static int handleTmrProtoRun(evmConsumerStruct *consumer, evmTimerStruct *tmr)
 
 	evm_log_info("(node: %u@%.8x) PROTO RUN started\n", ownCtact->myself->id, ownCtact->myself->addr);
 
-#if 1
+#if 0
 	/*set protocol timeout to find nearest nodes*/
 	ownCtact->tmrProtoRun = startTmrProtoRun(ownCtact->tmrProtoRun, 1, 0, (void *)ownCtact, tmridProtoRun);
 #endif
@@ -792,6 +797,43 @@ int disableNodeById(unsigned int id)
 	pthread_mutex_unlock(&nodes[id].amtx);
 
 	pthread_mutex_unlock(&simulation_global_mutex);
+	return 0;
+}
+
+int enableNodeById(unsigned int id)
+{
+	u2upNodeRingContactStruct *tmp = NULL;
+
+	pthread_mutex_lock(&simulation_global_mutex);
+	if (id >= max_nodes) {
+		pthread_mutex_unlock(&simulation_global_mutex);
+		return -1;
+	}
+
+	pthread_mutex_lock(&nodes[id].amtx);
+	tmp = nodes[id].retired_yng;
+	/* Reload all retired remote contacts of the node */
+	while (tmp->next != NULL) {
+		_insertNodeContact(nodes[id].ctacts, tmp->id, tmp->addr);
+		tmp = tmp->next;
+	}
+	nodes[id].active = U2UP_NET_TRUE;
+	pthread_mutex_unlock(&nodes[id].amtx);
+
+	pthread_mutex_unlock(&simulation_global_mutex);
+	return 0;
+}
+
+int enableAllNodes(void)
+{
+	int i, rv;
+
+	for (i = 0; i < max_nodes; i++) {
+		if (nodes[i].active == U2UP_NET_FALSE) {
+			if ((rv = enableNodeById(i)) != 0)
+				return rv;
+		}
+	}
 	return 0;
 }
 

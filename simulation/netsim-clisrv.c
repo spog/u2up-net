@@ -555,7 +555,47 @@ static int disable_handle(clisrv_token_struct *curr_tokens, char *buff, int size
 
 static int enable_handle(clisrv_token_struct *curr_tokens, char *buff, int size)
 {
-	printf("enable command handle called!'\n");
+	clisrv_token_struct *all_token;
+	clisrv_token_struct *addr_token;
+	clisrv_token_struct *id_token;
+	uint32_t addr;
+	unsigned int id;
+
+	if ((all_token = getCurrentToken(curr_tokens, "all")) != NULL) {
+		printf("enable command handle called (all)!'\n");
+		if (enableAllNodes() != 0)
+			snprintf(buff, size, "error: failed to enable all nodes!");
+		else
+			snprintf(buff, size, "enabled all nodes");
+		return 0;
+	} else
+	if ((addr_token = getCurrentToken(curr_tokens, "addr")) != NULL) {
+		if ((addr_token->eqval != NULL) && (strlen(addr_token->eqval) > 0)) {
+			sscanf(addr_token->eqval, addr_token->eqspec, &addr);
+		}
+		printf("enable command handle called (addr=%8x)!'\n", addr);
+		if (getNodeIdByAddr(addr, &id) != 0) {
+			clisrv_strncat(buff, "error: node id by addr not found!", size);
+			return 0;
+		}
+	} else
+	if ((id_token = getCurrentToken(curr_tokens, "id")) != NULL) {
+		if ((id_token->eqval != NULL) && (strlen(id_token->eqval) > 0)) {
+			sscanf(id_token->eqval, id_token->eqspec, &id);
+		}
+		printf("enable command handle called (id=%u)!'\n", id);
+		if (getNodeFirstAddrById(id, &addr) != 0) {
+			clisrv_strncat(buff, "error: node addr by id not found!", size);
+			return 0;
+		}
+	}
+	printf("enable command handle called (addr=%8x, id=%u)!'\n", addr, id);
+
+	if (enableNodeById(id) != 0)
+		snprintf(buff, size, "error: failed to enable node id=%u (addr=%.8x)!", id, addr);
+	else
+		snprintf(buff, size, "enabled node id=%u (addr=%.8x)", id, addr);
+
 	return 0;
 }
 
