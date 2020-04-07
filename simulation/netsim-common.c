@@ -272,11 +272,23 @@ u2upNodeRingContactStruct * _insertNodeContact(u2upNodeOwnCtactStruct *ownCtact,
 		own = own->next;
 	} while (own != NULL);
 
+	/*Check all contact addresses, if "addr" already inserted!*/
+	tmpNext = ownCtact->myself;
+	do {
+		if (tmpNext->addr == addr) { /*already inserted*/
+			if (tmpNext->id != id) /*set new ID, if required*/
+				tmpNext->id = id;
+			return tmpNext;
+		}
+		tmpNext = tmpNext->next;
+	} while (tmpNext != ownCtact->myself);
+
 	/*Should NEVER come down here, if "addr" is one of our own!*/
 	tmpNext = ownCtact->myself->next;
 	tmpPrev = ownCtact->myself->prev;
 	uDist2myself = calcUDistance(ownCtact->myself->addr, addr);
 	do {
+#if 0
 		if (tmpNext->addr == addr) { /*already inserted*/
 			if (tmpNext->id != id) /*set new ID, if required*/
 				tmpNext->id = id;
@@ -289,6 +301,7 @@ u2upNodeRingContactStruct * _insertNodeContact(u2upNodeOwnCtactStruct *ownCtact,
 			new = tmpPrev;
 			break;
 		}
+#endif
 		uDist2next = calcUDistance(ownCtact->myself->addr, tmpNext->addr);
 		uDist2prev = calcUDistance(ownCtact->myself->addr, tmpPrev->addr);
 		if ((tmpNext->next->addr != addr) && ((tmpNext == tmpNext->next) || (uDist2next > uDist2myself))) { /*insertion point found*/
@@ -299,6 +312,8 @@ u2upNodeRingContactStruct * _insertNodeContact(u2upNodeOwnCtactStruct *ownCtact,
 			tmpNext->prev->next = new;
 			tmpNext->prev = new;
 			ownCtact->numCtacts++;
+			if (ownCtact->numCtacts > node->maxCtacts)
+				_deleteNextContact(ownCtact, new->next);
 			break;
 		}
 		if ((tmpPrev->prev->addr != addr) && ((tmpPrev == tmpPrev->prev) || (uDist2prev < uDist2myself))) { /*insertion point found*/
@@ -309,6 +324,8 @@ u2upNodeRingContactStruct * _insertNodeContact(u2upNodeOwnCtactStruct *ownCtact,
 			tmpPrev->prev->next = new;
 			tmpPrev->prev = new;
 			ownCtact->numCtacts++;
+			if (ownCtact->numCtacts > node->maxCtacts)
+				_deletePrevContact(ownCtact, new->prev);
 			break;
 		}
 		if (uDist2next >= uDist2prev)
@@ -776,11 +793,24 @@ u2upNodeRingContactStruct * insertNearAddrContact(u2upNodeOwnCtactStruct *ownCta
 		own = own->next;
 	} while (own != NULL);
 
+	/*Check all contact addresses, if "addr" already inserted!*/
+	tmpNext = ownCtact->myself;
+	do {
+		if (tmpNext->addr == addr) { /*already inserted*/
+			if (tmpNext->id != id) /*set new ID, if required*/
+				tmpNext->id = id;
+			pthread_mutex_unlock(&node->amtx);
+			return tmpNext;
+		}
+		tmpNext = tmpNext->next;
+	} while (tmpNext != ownCtact->myself);
+
 	/*Should NEVER come down here, if "addr" is one of our own!*/
 	tmpNext = ownCtact->myself->next;
 	tmpPrev = ownCtact->myself->prev;
 	uDist2myself = calcUDistance(ownCtact->myself->addr, addr);
 	do {
+#if 0
 		if (tmpNext->addr == addr) { /*already inserted*/
 			if (tmpNext->id != id) /*set new ID, if required*/
 				tmpNext->id = id;
@@ -793,6 +823,7 @@ u2upNodeRingContactStruct * insertNearAddrContact(u2upNodeOwnCtactStruct *ownCta
 			new = tmpPrev;
 			break;
 		}
+#endif
 		uDist2next = calcUDistance(ownCtact->myself->addr, tmpNext->addr);
 		uDist2prev = calcUDistance(ownCtact->myself->addr, tmpPrev->addr);
 		if ((tmpNext->next->addr != addr) && ((tmpNext == tmpNext->next) || (uDist2next > uDist2myself))) { /*insertion point found*/
