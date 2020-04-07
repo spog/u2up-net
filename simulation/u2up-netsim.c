@@ -372,7 +372,7 @@ static int send_protocol_random_repl_msg(evmConsumerStruct *consumer, u2upNodeOw
 
 	if (send_protocol_msg(consumer, msgid_random_repl_ptr, destCtact, id, addr, ref) != 0)
 		return -1;
-	evm_log_info("(node: %u@%.8x with ref=%p) RANDOM REPLY sent to: %u@%.8x\n",
+	evm_log_info("(contact: %u@%.8x with ref=%p) RANDOM REPLY sent to: %u@%.8x\n",
 			id, addr, ref, destCtact->myself->id, destCtact->myself->addr);
 
 	return 0;
@@ -413,7 +413,7 @@ static int send_protocol_near_repl_msg(evmConsumerStruct *consumer, u2upNodeOwnC
 
 	if (send_protocol_msg(consumer, msgid_near_repl_ptr, destCtact, id, addr, ref) != 0)
 		return -1;
-	evm_log_info("(node: %u@%.8x with ref=%p) NEAR REPLY sent to: %u@%.8x\n",
+	evm_log_info("(contact: %u@%.8x with ref=%p) NEAR REPLY sent to: %u@%.8x\n",
 			id, addr, ref, destCtact->myself->id, destCtact->myself->addr);
 
 	return 0;
@@ -482,7 +482,7 @@ static int handleTmrProtoRun(evmConsumerStruct *consumer, evmTimerStruct *tmr)
 
 	pthread_mutex_lock(&node->amtx);
 	tmp = node->ctacts->myself->next;
-	/* got through all contacts of the node */
+	/* got through all remote contacts of the node */
 	do {
 		/* skip own addresses */
 		if (tmp->own != 1) {
