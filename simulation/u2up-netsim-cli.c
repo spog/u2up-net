@@ -223,6 +223,7 @@ typedef struct netsim_cli_log_entry netsimCliLogEntryStruct;
 
 struct netsim_cli_log {
 	FILE *file;
+	int num_file_entries;
 	netsimCliLogEntryStruct *first;
 	netsimCliLogEntryStruct *last;
 }; /*netsimCliLogStruct*/
@@ -238,7 +239,7 @@ static char incomplete_line[CLISRV_MAX_CMDSZ];
 
 #define CLISRV_BUFFSZ 16
 
-static int initCmdLineLog(char *fileName, netsimCliLogStruct *log)
+static int initCmdLineLog(char *fileName, netsimCliLogStruct *log, int logTrimLines)
 {
 	static char buff[CLISRV_BUFFSZ];
 	static char line[CLISRV_MAX_CMDSZ];
@@ -257,6 +258,7 @@ static int initCmdLineLog(char *fileName, netsimCliLogStruct *log)
 		return -1;
 	}
 
+	log->num_file_entries = 0;
 	log->file = fopen(fileName, "a+");
 	if (log->file == NULL) {
 		evm_log_system_error("fopen()\n");
@@ -302,7 +304,8 @@ static int initCmdLineLog(char *fileName, netsimCliLogStruct *log)
 				tmp = &((*tmp)->next);
 				consumed += tokensz;
 				token = &buff[consumed];
-				evm_log_debug("nl=%p, consumed=%d, token='%s'\n", nl, consumed, token);
+				log->num_file_entries++;
+				evm_log_debug("num_file_entries=%d, nl=%p, consumed=%d, token='%s'\n", log->num_file_entries, nl, consumed, token);
 				nl = strchr(token, '\n');
 			}
 			if (nl == NULL) {
@@ -322,6 +325,43 @@ static int initCmdLineLog(char *fileName, netsimCliLogStruct *log)
 	(*tmp)->next = *tmp;
 	(*tmp)->entry = NULL;
 	log->last = *tmp;
+
+	if ((logTrimLines != 0) && (log->num_file_entries > logTrimLines)) {
+		int i;
+		netsimCliLogEntryStruct *next;
+
+		for (i = 0; i < (log->num_file_entries - logTrimLines); i++) {
+			next = log->first->next->next;
+			free(log->first->next->entry);
+			free(log->first->next);
+			log->first->next = next;
+			next->prev = log->first;
+		}
+		evm_log_debug("Removing first %d entries (num_file_entries=%d)\n", (log->num_file_entries - logTrimLines), logTrimLines);
+		log->num_file_entries = logTrimLines;
+		fclose(log->file);
+		log->file = fopen(fileName, "w");
+		if (log->file == NULL) {
+			evm_log_system_error("fopen()\n");
+			return -1;
+		}
+		next = log->first->next;
+		while (next != next->next) {
+			int len = strlen(next->entry);
+
+			n = 0;
+			while ((n += fwrite(&(next->entry[n]), sizeof(char), (len - n), log->file)) < len);
+			fwrite("\n", sizeof(char), 1, log->file);
+			next = next->next;
+		}
+		fflush(log->file);
+		fclose(log->file);
+		log->file = fopen(fileName, "a+");
+		if (log->file == NULL) {
+			evm_log_system_error("fopen()\n");
+			return -1;
+		}
+	}
 
 	return 0;
 }
@@ -833,8 +873,8 @@ int main(int argc, char *argv[])
 		exit(EXIT_FAILURE);
 	}
 
-	/* Initialize History-log file */
-	if (initCmdLineLog(".u2up_clisrv_cmdlog", &netsimCliLog) < 0) {
+	/* Initialize History-log file (and trim to the last 100 lines)*/
+	if (initCmdLineLog(".u2up_clisrv_cmdlog", &netsimCliLog, 100) < 0) {
 		evm_log_error("initCmdLineLog()\n");
 		exit(EXIT_FAILURE);
 	}
