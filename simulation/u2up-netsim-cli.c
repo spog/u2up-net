@@ -237,7 +237,7 @@ struct netsim_cli_log_entry {
 static netsimCliLogStruct netsimCliLog;
 static char incomplete_line[CLISRV_MAX_CMDSZ];
 
-#define CLISRV_BUFFSZ 16
+#define CLISRV_BUFFSZ 512
 
 static int initCmdLineLog(char *fileName, netsimCliLogStruct *log, int logTrimLines)
 {
@@ -908,7 +908,7 @@ int main(int argc, char *argv[])
 	}
 
 	/* Initialize History-log file (and trim to the last 100 lines)*/
-	if (initCmdLineLog(".u2up_clisrv_cmdlog", &netsimCliLog, 10) < 0) {
+	if (initCmdLineLog(".u2up_clisrv_cmdlog", &netsimCliLog, 100) < 0) {
 		evm_log_error("initCmdLineLog()\n");
 		exit(EXIT_FAILURE);
 	}
