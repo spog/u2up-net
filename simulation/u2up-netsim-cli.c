@@ -238,6 +238,10 @@ static netsimCliLogStruct netsimCliLog;
 static char incomplete_line[CLISRV_MAX_CMDSZ];
 
 #define CLISRV_BUFFSZ 512
+#define CLISRV_TSF "%a, %d %b %Y %T"
+#define CLISRV_LTSM "["
+#define CLISRV_RTSM "] "
+#define CLISRV_PROMPT "netsim-cli> "
 
 static int initCmdLineLog(char *fileName, netsimCliLogStruct *log, int logTrimLines)
 {
@@ -395,7 +399,7 @@ static int saveCmdLineLog(char *cmdline, netsimCliLogStruct *log)
 	evm_log_debug("cmdlen=%d\n", cmdlen);
 	prev = log->last->prev;
 	if (prev->entry != NULL) {
-		if ((prevEntry = strstr(prev->entry, "> ")) != NULL)
+		if ((prevEntry = strstr(prev->entry, CLISRV_RTSM)) != NULL)
 			prevEntry += 2;
 		else
 			prevEntry = prev->entry;
@@ -411,7 +415,7 @@ static int saveCmdLineLog(char *cmdline, netsimCliLogStruct *log)
 		evm_log_system_error("localtime() - Log entry new time-stamp\n");
 		abort();
 	}
-	if (strftime(tsStr, sizeof(tsStr), "<%a, %d %b %Y %T> ", ptm) == 0) {
+	if (strftime(tsStr, sizeof(tsStr), CLISRV_LTSM CLISRV_TSF CLISRV_RTSM, ptm) == 0) {
 		evm_log_error("strftime() returned 0\n");
 		abort();
 	}
@@ -556,7 +560,7 @@ static int evaluate3char_sequence(char *const line, int i, char *const rline, in
 						i--;
 					}
 					line[0] = '\0';
-					if ((cmdEntry = strstr(cliLogEntryCurrent->entry, "> ")) != NULL)
+					if ((cmdEntry = strstr(cliLogEntryCurrent->entry, CLISRV_RTSM)) != NULL)
 						cmdEntry += 2;
 					else
 						cmdEntry = cliLogEntryCurrent->entry;
@@ -595,7 +599,7 @@ static int evaluate3char_sequence(char *const line, int i, char *const rline, in
 						i--;
 					}
 					line[0] = '\0';
-					if ((cmdEntry = strstr(cliLogEntryCurrent->entry, "> ")) != NULL)
+					if ((cmdEntry = strstr(cliLogEntryCurrent->entry, CLISRV_RTSM)) != NULL)
 						cmdEntry += 2;
 					else
 						cmdEntry = cliLogEntryCurrent->entry;
@@ -913,7 +917,7 @@ int main(int argc, char *argv[])
 		exit(EXIT_FAILURE);
 	}
 
-	printf("netsim-cli> ");
+	printf(CLISRV_PROMPT);
 	fflush(stdout);
 	while (U2UP_NET_TRUE) {
 #if 0 /*orig*/
@@ -993,7 +997,7 @@ int main(int argc, char *argv[])
 		if ((pre_begin == NULL) && (pre_end == NULL)) {
 			printf("%s", remain_str);
 		} else {
-			printf("netsim-cli> %s", remain_str);
+			printf(CLISRV_PROMPT"%s", remain_str);
 		}
 		fflush(stdout);
 	}
