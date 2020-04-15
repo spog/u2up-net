@@ -36,6 +36,7 @@
 #define U2UP_NET_TRUE (0 == 0)
 #define U2UP_NET_FALSE (0 != 0)
 
+#if 0 /*orig*/
 #define CLISRV_SOCK_PATH "/tmp/u2up-netsim-cli"
 #define LISTEN_BACKLOG 50
 #define CLISRV_MAX_CMDSZ 512
@@ -48,6 +49,7 @@ static inline char * clisrv_strncat(char *dst, const char *src, int dstsz)
 		return strncat(dst, src, room);
 	return dst;
 }
+#endif
 
 EXTERN int simulation_clisrv_init(evmStruct *evm);
 
