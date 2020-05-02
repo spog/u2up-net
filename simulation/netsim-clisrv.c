@@ -37,15 +37,15 @@
 #include <poll.h>
 #include <signal.h>
 
-#include <userlog/log_module.h>
-EVMLOG_MODULE_INIT(CLISRV, 2);
-
 #include <u2up-cli/u2up-clisrv.h>
 
 #include <evm/libevm.h>
 #include "u2up-netsim.h"
 #include "netsim-common.h"
 #include "netsim-clisrv.h"
+
+#define U2UP_LOG_NAME U2NETCLI
+#include <u2up-log/u2up-log.h>
 
 enum evm_msg_ids {
 	MSG_ID_CLISRV_INIT = 0,
@@ -244,7 +244,7 @@ static int test3_handle(clisrv_token_struct *curr_tokens, char *buff, int size)
 
 static int evClisrvInitMsg(evmConsumerStruct *consumer, evmMessageStruct *msg)
 {
-	evm_log_info("(cb entry) msg=%p\n", msg);
+	u2up_log_info("(cb entry) msg=%p\n", msg);
 
 	if ((consumer == NULL) || (msg == NULL))
 		return -1;
@@ -254,7 +254,7 @@ static int evClisrvInitMsg(evmConsumerStruct *consumer, evmMessageStruct *msg)
 
 static int handleTmrClisrvCmdTout(evmConsumerStruct *consumer, evmTimerStruct *tmr)
 {
-	evm_log_info("(cb entry) tmr=%p\n", tmr);
+	u2up_log_info("(cb entry) tmr=%p\n", tmr);
 
 	return 0;
 }
@@ -272,18 +272,18 @@ void * clisrv_ppoll_loop(void *arg)
 	struct clisrv_conn *newClisrvConns;
 	clisrv_pconn_struct *pconn;
 	char buffer[CLISRV_MAX_CMDSZ];
-	evm_log_info("(entry)\n");
+	u2up_log_info("(entry)\n");
 
 	/* Loop waiting for incoming connects or incoming data */
 	do {
 		if ((rv = ppoll(clisrvFds, clisrvNfds, &timeOut, &clisrv_sigmask)) < 0) {
-			evm_log_system_error("ppoll()\n");
+			u2up_log_system_error("ppoll()\n");
 			break;
 		}
 
 		/* Check if time out expired. */
 		if (rv == 0) {
-			evm_log_debug("ppoll() rv=%d\n", rv);
+			u2up_log_debug("ppoll() rv=%d\n", rv);
 			continue;
 		}
 
@@ -296,14 +296,14 @@ void * clisrv_ppoll_loop(void *arg)
 
 			/* Handle unexpected (non-POLLIN) events as fatal error */
 			if (clisrvFds[i].revents != POLLIN) {
-				evm_log_error("ppoll() - Unexpected event! revents = %d\n", clisrvFds[i].revents);
+				u2up_log_error("ppoll() - Unexpected event! revents = %d\n", clisrvFds[i].revents);
 				end_server = U2UP_CLI_TRUE;
 				break;
 			}
 
 			/* Handle listening socket */
 			if (clisrvFds[i].fd == clisrv_lsd) {
-				evm_log_debug("Listening socket is readable\n");
+				u2up_log_debug("Listening socket is readable\n");
 
 				/* Accept all connection queued up listening */
 				do {
@@ -311,16 +311,16 @@ void * clisrv_ppoll_loop(void *arg)
 					/* (all other errors are treated as fatal) */
 					if ((new_sd = accept(clisrv_lsd, NULL, NULL)) < 0) {
 						if (errno != EWOULDBLOCK) {
-							evm_log_system_error("accept()\n");
+							u2up_log_system_error("accept()\n");
 							end_server = U2UP_CLI_TRUE;
 						}
 						break;
 					}
 
 					/* New incoming connection - extend the pollfd structure */
-					evm_log_debug("New incoming connection - %d\n", new_sd);
+					u2up_log_debug("New incoming connection - %d\n", new_sd);
 					if ((newClisrvFds = (struct pollfd *)reallocarray(clisrvFds, clisrvNfds + 1, sizeof(struct pollfd))) == NULL) {
-						evm_log_system_error("realocarray() - clisrvFds\n");
+						u2up_log_system_error("realocarray() - clisrvFds\n");
 						end_server = U2UP_CLI_TRUE;
 						break;
 					}
@@ -328,13 +328,13 @@ void * clisrv_ppoll_loop(void *arg)
 					clisrvFds[clisrvNfds].fd = new_sd;
 					clisrvFds[clisrvNfds].events = POLLIN;
 					if ((newClisrvConns = (struct clisrv_conn *)reallocarray(clisrvConns, clisrvNfds + 1, sizeof(struct clisrv_conn))) == NULL) {
-						evm_log_system_error("realocarray() - clisrvConns\n");
+						u2up_log_system_error("realocarray() - clisrvConns\n");
 						end_server = U2UP_CLI_TRUE;
 						break;
 					}
 					clisrvConns = newClisrvConns;
 					if ((pconn = (clisrv_pconn_struct *)calloc(1, sizeof(clisrv_pconn_struct))) == NULL) {
-						evm_log_system_error("calloc() - pconn\n");
+						u2up_log_system_error("calloc() - pconn\n");
 						end_server = U2UP_CLI_TRUE;
 						break;
 					}
@@ -351,7 +351,7 @@ void * clisrv_ppoll_loop(void *arg)
 
 			/* Not the listening socket - an existing connection must be readable */
 			else {
-				evm_log_debug("Descriptor %d is readable\n", clisrvFds[i].fd);
+				u2up_log_debug("Descriptor %d is readable\n", clisrvFds[i].fd);
 				close_conn = U2UP_CLI_FALSE;
 
 				/* Receive all incoming data on this socket */
@@ -360,7 +360,7 @@ void * clisrv_ppoll_loop(void *arg)
 					/* (all other errors close the connection) */
 					if ((rv = recv(clisrvFds[i].fd, buffer, sizeof(buffer), 0)) < 0) {
 						if (errno != EWOULDBLOCK) {
-							evm_log_system_error("recv()\n");
+							u2up_log_system_error("recv()\n");
 							close_conn = U2UP_CLI_TRUE;
 						}
 						break;
@@ -368,26 +368,26 @@ void * clisrv_ppoll_loop(void *arg)
 
 					/* Has the connection been closed by the client? */
 					if (rv == 0) {
-						evm_log_debug("Connection closed\n");
+						u2up_log_debug("Connection closed\n");
 						close_conn = U2UP_CLI_TRUE;
 						break;
 					}
 
 					/* Data was received (including terminating null byte, if all data received) */
 					len = rv;
-					evm_log_debug("  %d bytes received\n", len);
+					u2up_log_debug("  %d bytes received\n", len);
 					printf("received data(strlen=%ld): '%s'\n", strlen(buffer), buffer);
 
 					/* Parse received data */
 					if ((rv = parseReceivedData(clisrvConns[i].pconn, buffer, len)) < 0) {
-						evm_log_error("parseReceivedData()\n");
+						u2up_log_error("parseReceivedData()\n");
 						close_conn = U2UP_CLI_TRUE;
 						break;
 					}
 
 					/* Send response data (including terminating null byte) back to the client */
 					if ((rv = send(clisrvFds[i].fd, clisrvConns[i].pconn->snd, clisrvConns[i].pconn->sndsz, 0)) < 0) {
-						evm_log_system_error("send()\n");
+						u2up_log_system_error("send()\n");
 						close_conn = U2UP_CLI_TRUE;
 						break;
 					}
@@ -443,10 +443,10 @@ int clisrvSocket_init(const char *path)
 	pthread_t ppoll_thread;
 
 	if (path == NULL)
-		evm_log_return_err("socket path not provided (NULL)!\n");
+		u2up_log_return_err("socket path not provided (NULL)!\n");
 
 	if (*path == '\0')
-		evm_log_return_err("socket name is empty string!\n");
+		u2up_log_return_err("socket name is empty string!\n");
 
 	/* Initialize FD passing socket address... */
 	if ((rv = stat(path, &st)) == 0) {
@@ -454,34 +454,34 @@ int clisrvSocket_init(const char *path)
 		if ((st.st_mode & S_IFMT) == S_IFSOCK) {
 			rv = unlink(path);
 			if (rv != 0) {
-				evm_log_return_err("Error unlinking the socket node");
+				u2up_log_return_err("Error unlinking the socket node");
 			}
 		} else {
 			/* Not a socket, so do not unlink */
-			evm_log_return_err("The path already exists and is not a socket.\n");
+			u2up_log_return_err("The path already exists and is not a socket.\n");
 		}
 	} else {
 		if (errno != ENOENT) {
-			evm_log_return_err("stat() - Error on the socket path");
+			u2up_log_return_err("stat() - Error on the socket path");
 		}
 	}
 
 	/* Create a socket */
 	listen_sd = socket(AF_UNIX, SOCK_STREAM, 0);
 	if (listen_sd == -1)
-		evm_log_return_err("socket()\n");
+		u2up_log_return_err("socket()\n");
 
 	/* Make socket reusable */
 	rv = setsockopt(listen_sd, SOL_SOCKET, SO_REUSEADDR, (char *)&on, sizeof(on));
 	if (rv < 0)
-		evm_log_return_err("setsockopt()\n");
+		u2up_log_return_err("setsockopt()\n");
 
 	/* Set socket nonblocking (and all its successors) */
 	if ((flags = fcntl(listen_sd, F_GETFL, 0)) < 0)
-		evm_log_return_err("fcntl()\n");
+		u2up_log_return_err("fcntl()\n");
 
 	if ((rv = fcntl(listen_sd, F_SETFL, flags | O_NONBLOCK)) < 0)
-		evm_log_return_err("fcntl()\n");
+		u2up_log_return_err("fcntl()\n");
 
 	/* Ready to bind a Unix socket. */
 	memset(&addr, 0, sizeof(struct sockaddr_un));
@@ -489,16 +489,16 @@ int clisrvSocket_init(const char *path)
 	strcpy(addr.sun_path, path);
 
 	if ((rv = bind(listen_sd, (struct sockaddr *)&addr, sizeof(struct sockaddr_un))) == -1)
-		evm_log_return_err("bind() sockfd=%d\n", listen_sd);
+		u2up_log_return_err("bind() sockfd=%d\n", listen_sd);
 
 	if ((rv = listen(listen_sd, LISTEN_BACKLOG)) == -1)
-		evm_log_return_err("listen() sockfd=%d\n", listen_sd);
+		u2up_log_return_err("listen() sockfd=%d\n", listen_sd);
 
-	evm_log_debug("CLI server listening socket ready (bind FD: %d).\n", listen_sd);
+	u2up_log_debug("CLI server listening socket ready (bind FD: %d).\n", listen_sd);
 
 	/* Initialize the pollfd structure */
 	if ((clisrvFds = (struct pollfd *)calloc(1, sizeof(struct pollfd))) == NULL) {
-		evm_log_system_error("calloc() - struct pollfd\n");
+		u2up_log_system_error("calloc() - struct pollfd\n");
 		return -1;
 	}
 
@@ -508,7 +508,7 @@ int clisrvSocket_init(const char *path)
 
 	/* Initialize the clisrv_conn structure */
 	if ((clisrvConns = (struct clisrv_conn *)calloc(1, sizeof(struct clisrv_conn))) == NULL) {
-		evm_log_system_error("calloc() - struct clisrv_conn\n");
+		u2up_log_system_error("calloc() - struct clisrv_conn\n");
 		return -1;
 	}
 
@@ -520,11 +520,11 @@ int clisrvSocket_init(const char *path)
 
 	/* Start the polling thread */
 	if ((rv = pthread_attr_init(&attr)) != 0)
-		evm_log_return_system_err("pthread_attr_init()\n");
+		u2up_log_return_system_err("pthread_attr_init()\n");
 
 	if ((rv = pthread_create(&ppoll_thread, &attr, clisrv_ppoll_loop, NULL)) != 0)
-		evm_log_return_system_err("pthread_create()\n");
-	evm_log_debug("pthread_create() rv=%d\n", rv);
+		u2up_log_return_system_err("pthread_create()\n");
+	u2up_log_debug("pthread_create() rv=%d\n", rv);
 
 	return listen_sd;
 }
@@ -534,45 +534,45 @@ int simulation_clisrv_init(evmStruct *evm)
 {
 	int rv = 0;
 
-	evm_log_info("(entry)\n");
+	u2up_log_info("(entry)\n");
 
 	if (evm == NULL)
 		return -1;
 
 #if 1
 	if ((rv == 0) && ((clisrv_pcmds = tokenizeCliCmds(clisrv_cmds)) == NULL)) {
-		evm_log_error("tokenizeCliCmds() failed!\n");
+		u2up_log_error("tokenizeCliCmds() failed!\n");
 		rv = -1;
 	}
 #endif
 	if ((rv == 0) && ((clisrv_consumer = evm_consumer_add(evm, EVM_CONSUMER_CLISRV)) == NULL)) {
-		evm_log_error("evm_consumer_add(EVM_CONSUMER_CLISRV) failed!\n");
+		u2up_log_error("evm_consumer_add(EVM_CONSUMER_CLISRV) failed!\n");
 		rv = -1;
 	}
 	if ((rv == 0) && ((msgtype_ptr = evm_msgtype_add(evm, EV_TYPE_CLISRV_MSG)) == NULL)) {
-		evm_log_error("evm_msgtype_add() failed!\n");
+		u2up_log_error("evm_msgtype_add() failed!\n");
 		rv = -1;
 	}
 	if ((rv == 0) && ((msgid_init_ptr = evm_msgid_add(msgtype_ptr, MSG_ID_CLISRV_INIT)) == NULL)) {
-		evm_log_error("evm_msgid_add() failed!\n");
+		u2up_log_error("evm_msgid_add() failed!\n");
 		rv = -1;
 	}
 	if ((rv == 0) && (evm_msgid_cb_handle_set(msgid_init_ptr, evClisrvInitMsg) < 0)) {
-		evm_log_error("evm_msgid_cb_handle() failed!\n");
+		u2up_log_error("evm_msgid_cb_handle() failed!\n");
 		rv = -1;
 	}
 	/* Prepare CLISRV_CMDTOUT timer */
 	if ((rv == 0) && ((tmridClisrvCmdTout = evm_tmrid_add(evm, TMR_ID_CLISRV_CMDTOUT)) == NULL)) {
-		evm_log_error("evm_tmrid_add() failed!\n");
+		u2up_log_error("evm_tmrid_add() failed!\n");
 		rv = -1;
 	}
 	if ((rv == 0) && (evm_tmrid_cb_handle_set(tmridClisrvCmdTout, handleTmrClisrvCmdTout) < 0)) {
-		evm_log_error("evm_tmrid_cb_handle_set() failed!\n");
+		u2up_log_error("evm_tmrid_cb_handle_set() failed!\n");
 		rv = -1;
 	}
 	/* Initialize CLI server listen socket */
 	if ((rv == 0) && ((clisrv_lsd = clisrvSocket_init(CLISRV_SOCK_PATH)) < 0)) {
-		evm_log_error("clisrvSocket_init() failed!\n");
+		u2up_log_error("clisrvSocket_init() failed!\n");
 		rv = -1;
 	}
 

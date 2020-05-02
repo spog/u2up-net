@@ -36,20 +36,13 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 
-#include <userlog/log_module.h>
-EVMLOG_MODULE_INIT(U2UP_CLI, 2);
-
 #include <u2up-cli/u2up-clicli.h>
 
-#include "u2up-netsim-cli.h"
+#define U2UP_LOG_NAME U2NETCLI
+#include <u2up-log/u2up-log.h>
+U2UP_LOG_DECLARE(U2CLICLI);
 
-unsigned int log_mask;
-unsigned int evmlog_normal = 1;
-unsigned int evmlog_verbose = 0;
-unsigned int evmlog_trace = 0;
-unsigned int evmlog_debug = 0;
-unsigned int evmlog_use_syslog = 0;
-unsigned int evmlog_add_header = 1;
+#include "u2up-netsim-cli.h"
 
 static unsigned int option_cmd = 0;
 
@@ -61,14 +54,14 @@ static void usage_help(char *argv[])
 	printf("\t-c, --cmd                Execute command and exit.");
 	printf("\t-q, --quiet              Disable all output.\n");
 	printf("\t-v, --verbose            Enable verbose output.\n");
-#if (EVMLOG_MODULE_TRACE != 0)
+#if (U2UP_LOG_MODULE_TRACE != 0)
 	printf("\t-t, --trace              Enable trace output.\n");
 #endif
-#if (EVMLOG_MODULE_DEBUG != 0)
+#if (U2UP_LOG_MODULE_DEBUG != 0)
 	printf("\t-g, --debug              Enable debug output.\n");
 #endif
-	printf("\t-s, --syslog             Redirect EVMLOG output to syslog (instead of stdout, stderr).\n");
-	printf("\t-n, --no-header          No EVMLOG header added to every evm_log_... output.\n");
+	printf("\t-s, --syslog             Redirect U2UP_LOG output to syslog (instead of stdout, stderr).\n");
+	printf("\t-n, --no-header          No U2UP_LOG header added to every u2up_log_... output.\n");
 	printf("\t-h, --help               Displays this text.\n");
 }
 
@@ -82,10 +75,10 @@ static int usage_check(int argc, char *argv[])
 			{"cmd", 0, 0, 'c'},
 			{"quiet", 0, 0, 'q'},
 			{"verbose", 0, 0, 'v'},
-#if (EVMLOG_MODULE_TRACE != 0)
+#if (U2UP_LOG_MODULE_TRACE != 0)
 			{"trace", 0, 0, 't'},
 #endif
-#if (EVMLOG_MODULE_DEBUG != 0)
+#if (U2UP_LOG_MODULE_DEBUG != 0)
 			{"debug", 0, 0, 'g'},
 #endif
 			{"no-header", 0, 0, 'n'},
@@ -94,11 +87,11 @@ static int usage_check(int argc, char *argv[])
 			{0, 0, 0, 0}
 		};
 
-#if (EVMLOG_MODULE_TRACE != 0) && (EVMLOG_MODULE_DEBUG != 0)
+#if (U2UP_LOG_MODULE_TRACE != 0) && (U2UP_LOG_MODULE_DEBUG != 0)
 		c = getopt_long(argc, argv, "cqvtgnsh", long_options, &option_index);
-#elif (EVMLOG_MODULE_TRACE == 0) && (EVMLOG_MODULE_DEBUG != 0)
+#elif (U2UP_LOG_MODULE_TRACE == 0) && (U2UP_LOG_MODULE_DEBUG != 0)
 		c = getopt_long(argc, argv, "cqvgnsh", long_options, &option_index);
-#elif (EVMLOG_MODULE_TRACE != 0) && (EVMLOG_MODULE_DEBUG == 0)
+#elif (U2UP_LOG_MODULE_TRACE != 0) && (U2UP_LOG_MODULE_DEBUG == 0)
 		c = getopt_long(argc, argv, "cqvtnsh", long_options, &option_index);
 #else
 		c = getopt_long(argc, argv, "cqvnsh", long_options, &option_index);
@@ -112,31 +105,37 @@ static int usage_check(int argc, char *argv[])
 			break;
 
 		case 'q':
-			evmlog_normal = 0;
+			U2UP_LOG_SET_NORMAL(0);
+			U2UP_LOG_SET_NORMAL2(U2CLICLI, 0);
 			break;
 
 		case 'v':
-			evmlog_verbose = 1;
+			U2UP_LOG_SET_VERBOSE(1);
+			U2UP_LOG_SET_VERBOSE2(U2CLICLI, 1);
 			break;
 
-#if (EVMLOG_MODULE_TRACE != 0)
+#if (U2UP_LOG_MODULE_TRACE != 0)
 		case 't':
-			evmlog_trace = 1;
+			U2UP_LOG_SET_TRACE(1);
+			U2UP_LOG_SET_TRACE2(U2CLICLI, 1);
 			break;
 #endif
 
-#if (EVMLOG_MODULE_DEBUG != 0)
+#if (U2UP_LOG_MODULE_DEBUG != 0)
 		case 'g':
-			evmlog_debug = 1;
+			U2UP_LOG_SET_DEBUG(1);
+			U2UP_LOG_SET_DEBUG2(U2CLICLI, 1);
 			break;
 #endif
 
 		case 'n':
-			evmlog_add_header = 0;
+			U2UP_LOG_SET_HEADER(0);
+			U2UP_LOG_SET_HEADER2(U2CLICLI, 0);
 			break;
 
 		case 's':
-			evmlog_use_syslog = 1;
+			U2UP_LOG_SET_SYSLOG(1);
+			U2UP_LOG_SET_SYSLOG2(U2CLICLI, 1);
 			break;
 
 		case 'h':
@@ -170,30 +169,30 @@ int clisrvSocket_init(const char *path)
 	int conn_sd;
 	struct stat st;
 	struct sockaddr_un addr;
-	evm_log_info("(entry) path: %s\n", path);
+	u2up_log_info("(entry) path: %s\n", path);
 
 	if (path == NULL)
-		evm_log_return_err("socket path not provided (NULL)!\n");
+		u2up_log_return_err("socket path not provided (NULL)!\n");
 
 	if (*path == '\0')
-		evm_log_return_err("socket name is empty string!\n");
+		u2up_log_return_err("socket name is empty string!\n");
 
 	/* Initialize FD passing socket address... */
 	if ((rv = stat(path, &st)) == 0) {
 		/* Fle exists - check if socket */
 		if ((st.st_mode & S_IFMT) != S_IFSOCK) {
 			/* Not a socket, so do not unlink */
-			evm_log_return_err("The path already exists and is not a socket.\n");
+			u2up_log_return_err("The path already exists and is not a socket.\n");
 		}
 	} else {
 		if (errno != ENOENT) {
-			evm_log_return_err("stat() - Error on the socket path");
+			u2up_log_return_err("stat() - Error on the socket path");
 		}
 	}
 
 	/* Create a socket */
 	if ((conn_sd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1)
-		evm_log_return_system_err("socket()\n");
+		u2up_log_return_system_err("socket()\n");
 
 	/* Initialize socket address structure and connect. */
 	memset(&addr, 0, sizeof(struct sockaddr_un));
@@ -201,9 +200,9 @@ int clisrvSocket_init(const char *path)
 	strcpy(addr.sun_path, path);
 
 	if ((rv = connect(conn_sd, (struct sockaddr *)&addr, sizeof(struct sockaddr_un))) == -1)
-		evm_log_return_system_err("connect() - conn_d=%d\n", conn_sd);
+		u2up_log_return_system_err("connect() - conn_d=%d\n", conn_sd);
 
-	evm_log_debug("Client socket connected (connect FD: %d).\n", conn_sd);
+	u2up_log_debug("Client socket connected (connect FD: %d).\n", conn_sd);
 
 	return conn_sd;
 }
@@ -211,25 +210,25 @@ int clisrvSocket_init(const char *path)
 static int socketSendReceive(int sock, char *snd_str, char *rcv_buf, size_t rcv_buf_size)
 {
 	int rv = 0;
-	evm_log_info("(entry) sock=%d\n", sock);
+	u2up_log_info("(entry) sock=%d\n", sock);
 
 	/* Send cmd-data string over the connection socket (including terminating null byte) */
 	rv = send(sock, snd_str, strlen(snd_str) + 1, 0);
 	if (rv != strlen(snd_str) + 1) {
-		evm_log_system_error("send()\n");
+		u2up_log_system_error("send()\n");
 		close(sock);
 		return -1;
 	}
-	evm_log_debug("%d bytes sent\n", rv);
+	u2up_log_debug("%d bytes sent\n", rv);
 
 	/* Receive data from the connection socket (including terminating null byte) */
 	rv = recv(sock, rcv_buf, rcv_buf_size, 0);
 	if (rv <= 0) {
-		evm_log_system_error("recv()\n");
+		u2up_log_system_error("recv()\n");
 		close(sock);
 		return -1;
 	}
-	evm_log_debug("%d bytes received\n", rv);
+	u2up_log_debug("%d bytes received\n", rv);
 
 	return 0;
 }
@@ -245,20 +244,20 @@ int main(int argc, char *argv[])
 
 	/* Initialize CLI server listen socket */
 	if ((sockfd = clisrvSocket_init(CLISRV_SOCK_PATH)) < 0) {
-		evm_log_error("clisrvSocket_init() failed!\n");
+		u2up_log_error("clisrvSocket_init() failed!\n");
 		exit(EXIT_FAILURE);
 	}
 
 	/* Initialize History-log file (and trim to the last 100 lines) */
 	if (initCmdLineLog(".u2up_clisrv_cmdlog", 100) < 0) {
-		evm_log_error("initCmdLineLog()\n");
+		u2up_log_error("initCmdLineLog()\n");
 		close(sockfd);
 		exit(EXIT_FAILURE);
 	}
 
 	/* Process CLI commands */
 	if (processCliCmds(sockfd, socketSendReceive) < 0) {
-		evm_log_error("processCliCmds()\n");
+		u2up_log_error("processCliCmds()\n");
 		close(sockfd);
 		exit(EXIT_FAILURE);
 	}

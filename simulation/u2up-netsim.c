@@ -51,16 +51,16 @@
 #include "netsim-common.h"
 #include "netsim-clisrv.h"
 
-#include <userlog/log_module.h>
-EVMLOG_MODULE_INIT(U2UP_SIM, 2);
+#define U2UP_LOG_NAME U2NETSIM
+#include <u2up-log/u2up-log.h>
+/* Declare all other used "u2up-log" modules: */
+U2UP_LOG_DECLARE(EVM_CORE);
+U2UP_LOG_DECLARE(EVM_MSGS);
+U2UP_LOG_DECLARE(EVM_TMRS);
+U2UP_LOG_DECLARE(U2NETCLI);
+U2UP_LOG_DECLARE(U2CLISRV);
 
 unsigned int log_mask;
-unsigned int evmlog_normal = 1;
-unsigned int evmlog_verbose = 0;
-unsigned int evmlog_trace = 0;
-unsigned int evmlog_debug = 0;
-unsigned int evmlog_use_syslog = 0;
-unsigned int evmlog_add_header = 1;
 
 unsigned int auto_dump = 0;
 unsigned int batch_nodes = 1;
@@ -81,14 +81,14 @@ static void usage_help(char *argv[])
 	printf("\t-b, --batch-nodes        Number of nodes to be created in a batch (default=%u).\n", batch_nodes);
 	printf("\t-m, --max-nodes          Maximum number of all nodes to be created (default=%u).\n", max_nodes);
 	printf("\t-o, --outfile            Output [path/]filename prefix (default=%s).\n", default_outfile);
-#if (EVMLOG_MODULE_TRACE != 0)
+#if (U2UP_LOG_MODULE_TRACE != 0)
 	printf("\t-t, --trace              Enable trace output.\n");
 #endif
-#if (EVMLOG_MODULE_DEBUG != 0)
+#if (U2UP_LOG_MODULE_DEBUG != 0)
 	printf("\t-g, --debug              Enable debug output.\n");
 #endif
 	printf("\t-s, --syslog             Enable syslog output (instead of stdout, stderr).\n");
-	printf("\t-n, --no-header          No EVMLOG header added to every evm_log_... output.\n");
+	printf("\t-n, --no-header          No U2UP_LOG header added to every u2up_log_... output.\n");
 	printf("\t-h, --help               Displays this text.\n");
 }
 
@@ -105,10 +105,10 @@ static int usage_check(int argc, char *argv[])
 			{"batch-nodes", 1, 0, 'b'},
 			{"max-nodes", 1, 0, 'm'},
 			{"outfile", 1, 0, 'o'},
-#if (EVMLOG_MODULE_TRACE != 0)
+#if (U2UP_LOG_MODULE_TRACE != 0)
 			{"trace", 0, 0, 't'},
 #endif
-#if (EVMLOG_MODULE_DEBUG != 0)
+#if (U2UP_LOG_MODULE_DEBUG != 0)
 			{"debug", 0, 0, 'g'},
 #endif
 			{"no-header", 0, 0, 'n'},
@@ -117,11 +117,11 @@ static int usage_check(int argc, char *argv[])
 			{0, 0, 0, 0}
 		};
 
-#if (EVMLOG_MODULE_TRACE != 0) && (EVMLOG_MODULE_DEBUG != 0)
+#if (U2UP_LOG_MODULE_TRACE != 0) && (U2UP_LOG_MODULE_DEBUG != 0)
 		c = getopt_long(argc, argv, "qvab:m:o:tgnsh", long_options, &option_index);
-#elif (EVMLOG_MODULE_TRACE == 0) && (EVMLOG_MODULE_DEBUG != 0)
+#elif (U2UP_LOG_MODULE_TRACE == 0) && (U2UP_LOG_MODULE_DEBUG != 0)
 		c = getopt_long(argc, argv, "qvab:m:o:gnsh", long_options, &option_index);
-#elif (EVMLOG_MODULE_TRACE != 0) && (EVMLOG_MODULE_DEBUG == 0)
+#elif (U2UP_LOG_MODULE_TRACE != 0) && (U2UP_LOG_MODULE_DEBUG == 0)
 		c = getopt_long(argc, argv, "qvab:m:o:tnsh", long_options, &option_index);
 #else
 		c = getopt_long(argc, argv, "qvab:m:o:nsh", long_options, &option_index);
@@ -131,11 +131,21 @@ static int usage_check(int argc, char *argv[])
 
 		switch (c) {
 		case 'q':
-			evmlog_normal = 0;
+			U2UP_LOG_SET_NORMAL(0);
+			U2UP_LOG_SET_NORMAL2(EVM_CORE, 0);
+			U2UP_LOG_SET_NORMAL2(EVM_MSGS, 0);
+			U2UP_LOG_SET_NORMAL2(EVM_TMRS, 0);
+			U2UP_LOG_SET_NORMAL2(U2NETCLI, 0);
+			U2UP_LOG_SET_NORMAL2(U2CLISRV, 0);
 			break;
 
 		case 'v':
-			evmlog_verbose = 1;
+			U2UP_LOG_SET_VERBOSE(1);
+			U2UP_LOG_SET_VERBOSE2(EVM_CORE, 1);
+			U2UP_LOG_SET_VERBOSE2(EVM_MSGS, 1);
+			U2UP_LOG_SET_VERBOSE2(EVM_TMRS, 1);
+			U2UP_LOG_SET_VERBOSE2(U2NETCLI, 1);
+			U2UP_LOG_SET_VERBOSE2(U2CLISRV, 1);
 			break;
 
 		case 'a':
@@ -157,24 +167,44 @@ static int usage_check(int argc, char *argv[])
 			asprintf(&outfile, "%s_%.4d-%.2d-%.2d-%.2d%.2d", optarg, start.tm_year + 1900, start.tm_mon + 1, start.tm_mday, start.tm_hour, start.tm_min);
 			break;
 
-#if (EVMLOG_MODULE_TRACE != 0)
+#if (U2UP_LOG_MODULE_TRACE != 0)
 		case 't':
-			evmlog_trace = 1;
+			U2UP_LOG_SET_TRACE(1);
+			U2UP_LOG_SET_TRACE2(EVM_CORE, 1);
+			U2UP_LOG_SET_TRACE2(EVM_MSGS, 1);
+			U2UP_LOG_SET_TRACE2(EVM_TMRS, 1);
+			U2UP_LOG_SET_TRACE2(U2NETCLI, 1);
+			U2UP_LOG_SET_TRACE2(U2CLISRV, 1);
 			break;
 #endif
 
-#if (EVMLOG_MODULE_DEBUG != 0)
+#if (U2UP_LOG_MODULE_DEBUG != 0)
 		case 'g':
-			evmlog_debug = 1;
+			U2UP_LOG_SET_DEBUG(1);
+			U2UP_LOG_SET_DEBUG2(EVM_CORE, 1);
+			U2UP_LOG_SET_DEBUG2(EVM_MSGS, 1);
+			U2UP_LOG_SET_DEBUG2(EVM_TMRS, 1);
+			U2UP_LOG_SET_DEBUG2(U2NETCLI, 1);
+			U2UP_LOG_SET_DEBUG2(U2CLISRV, 1);
 			break;
 #endif
 
 		case 'n':
-			evmlog_add_header = 0;
+			U2UP_LOG_SET_HEADER(0);
+			U2UP_LOG_SET_HEADER2(EVM_CORE, 0);
+			U2UP_LOG_SET_HEADER2(EVM_MSGS, 0);
+			U2UP_LOG_SET_HEADER2(EVM_TMRS, 0);
+			U2UP_LOG_SET_HEADER2(U2NETCLI, 0);
+			U2UP_LOG_SET_HEADER2(U2CLISRV, 0);
 			break;
 
 		case 's':
-			evmlog_use_syslog = 1;
+			U2UP_LOG_SET_SYSLOG(1);
+			U2UP_LOG_SET_SYSLOG2(EVM_CORE, 1);
+			U2UP_LOG_SET_SYSLOG2(EVM_MSGS, 1);
+			U2UP_LOG_SET_SYSLOG2(EVM_TMRS, 1);
+			U2UP_LOG_SET_SYSLOG2(U2NETCLI, 1);
+			U2UP_LOG_SET_SYSLOG2(U2CLISRV, 1);
 			break;
 
 		case 'h':
@@ -274,7 +304,7 @@ static evmTimerStruct *tmrAuthBatch;
 
 static evmTimerStruct * auth_start_timer(evmTimerStruct *tmr, time_t tv_sec, long tv_nsec, void *ctx_ptr, evmTmridStruct *tmrid_ptr)
 {
-	evm_log_info("(entry) tmr=%p, sec=%ld, nsec=%ld, ctx_ptr=%p\n", tmr, tv_sec, tv_nsec, ctx_ptr);
+	u2up_log_info("(entry) tmr=%p, sec=%ld, nsec=%ld, ctx_ptr=%p\n", tmr, tv_sec, tv_nsec, ctx_ptr);
 
 	if (evm_timer_stop(tmr) == 0)
 		evm_timer_delete(tmr);
@@ -284,7 +314,7 @@ static evmTimerStruct * auth_start_timer(evmTimerStruct *tmr, time_t tv_sec, lon
 
 static evmTimerStruct * startTmrProtoRun(evmTimerStruct *tmr, time_t tv_sec, long tv_nsec, void *ctx_ptr, evmTmridStruct *tmrid_ptr)
 {
-	evm_log_info("(entry) tmr=%p, sec=%ld, nsec=%ld, ctx_ptr=%p\n", tmr, tv_sec, tv_nsec, ctx_ptr);
+	u2up_log_info("(entry) tmr=%p, sec=%ld, nsec=%ld, ctx_ptr=%p\n", tmr, tv_sec, tv_nsec, ctx_ptr);
 
 	if (evm_timer_stop(tmr) == 0)
 		evm_timer_delete(tmr);
@@ -297,18 +327,18 @@ static int send_protocol_msg(evmConsumerStruct *consumer, evmMsgidStruct *msgid_
 {
 	evmMessageStruct *msg;
 	u2upProtocolMsgDataStruct *data = NULL;
-	evm_log_info("(entry) consumer=%p, msgid_ptr=%p, destCtact=%p, from=%u@%.8x\n", consumer, msgid_ptr, destCtact, id, addr);
+	u2up_log_info("(entry) consumer=%p, msgid_ptr=%p, destCtact=%p, from=%u@%.8x\n", consumer, msgid_ptr, destCtact, id, addr);
 
 	if ((consumer == NULL) || (msgid_ptr == NULL) || (destCtact == NULL))
 		return -1;
 
 	if ((msg = evm_message_new(msgtype_ptr, msgid_ptr, sizeof(u2upProtocolMsgDataStruct))) == NULL) {
-		evm_log_error("evm_message_new() failed!\n");
+		u2up_log_error("evm_message_new() failed!\n");
 		return -1;
 	}
 
 	if ((data = (u2upProtocolMsgDataStruct *)evm_message_data_get(msg)) == NULL) {
-		evm_log_error("evm_message_data_get() failed!\n");
+		u2up_log_error("evm_message_data_get() failed!\n");
 		return -1;
 	}
 
@@ -326,7 +356,7 @@ static int send_protocol_msg(evmConsumerStruct *consumer, evmMsgidStruct *msgid_
 
 static int send_protocol_init_msg(evmConsumerStruct *consumer, u2upNodeOwnCtactStruct *destCtact, unsigned int id, uint32_t addr)
 {
-	evm_log_info("(entry) consumer=%p, destCtact=%p, from=%u@%.8x\n", consumer, destCtact, id, addr);
+	u2up_log_info("(entry) consumer=%p, destCtact=%p, from=%u@%.8x\n", consumer, destCtact, id, addr);
 
 	if ((consumer == NULL) || (destCtact == NULL))
 		return -1;
@@ -341,7 +371,7 @@ static int send_protocol_random_req_msg(evmConsumerStruct *consumer, u2upNodeOwn
 {
 	evmTimerStruct *tmr;
 	u2upProtocolTmrCtxStruct *tmrCtx;
-	evm_log_info("(entry) consumer=%p, destCtact=%p, from=%u@%.8x\n", consumer, destCtact, id, addr);
+	u2up_log_info("(entry) consumer=%p, destCtact=%p, from=%u@%.8x\n", consumer, destCtact, id, addr);
 
 	if ((consumer == NULL) || (destCtact == NULL))
 		return -1;
@@ -357,7 +387,7 @@ static int send_protocol_random_req_msg(evmConsumerStruct *consumer, u2upNodeOwn
 
 	if (send_protocol_msg(consumer, msgid_random_req_ptr, destCtact, id, addr, (void *)tmr) != 0)
 		return -1;
-	evm_log_info("(node: %u@%.8x with tmr=%p) RANDOM REQUEST sent to: %u@%.8x\n",
+	u2up_log_info("(node: %u@%.8x with tmr=%p) RANDOM REQUEST sent to: %u@%.8x\n",
 			id, addr, tmr, destCtact->myself->id, destCtact->myself->addr);
 
 	return 0;
@@ -365,14 +395,14 @@ static int send_protocol_random_req_msg(evmConsumerStruct *consumer, u2upNodeOwn
 
 static int send_protocol_random_repl_msg(evmConsumerStruct *consumer, u2upNodeOwnCtactStruct *destCtact, unsigned int id, uint32_t addr, void *ref)
 {
-	evm_log_info("(entry) consumer=%p, destCtact=%p, from=%u@%.8x, ref=%p\n", consumer, destCtact, id, addr, ref);
+	u2up_log_info("(entry) consumer=%p, destCtact=%p, from=%u@%.8x, ref=%p\n", consumer, destCtact, id, addr, ref);
 
 	if ((consumer == NULL) || (destCtact == NULL))
 		return -1;
 
 	if (send_protocol_msg(consumer, msgid_random_repl_ptr, destCtact, id, addr, ref) != 0)
 		return -1;
-	evm_log_info("(contact: %u@%.8x with ref=%p) RANDOM REPLY sent to: %u@%.8x\n",
+	u2up_log_info("(contact: %u@%.8x with ref=%p) RANDOM REPLY sent to: %u@%.8x\n",
 			id, addr, ref, destCtact->myself->id, destCtact->myself->addr);
 
 	return 0;
@@ -382,7 +412,7 @@ static int send_protocol_near_req_msg(evmConsumerStruct *consumer, u2upNodeOwnCt
 {
 	evmTimerStruct *tmr;
 	u2upProtocolTmrCtxStruct *tmrCtx;
-	evm_log_info("(entry) consumer=%p, destCtact=%p, from=%u@%.8x\n", consumer, destCtact, id, addr);
+	u2up_log_info("(entry) consumer=%p, destCtact=%p, from=%u@%.8x\n", consumer, destCtact, id, addr);
 
 	if ((consumer == NULL) || (destCtact == NULL))
 		return -1;
@@ -398,7 +428,7 @@ static int send_protocol_near_req_msg(evmConsumerStruct *consumer, u2upNodeOwnCt
 
 	if (send_protocol_msg(consumer, msgid_near_req_ptr, destCtact, id, addr, (void *)tmr) != 0)
 		return -1;
-	evm_log_info("(node: %u@%.8x with tmr=%p) NEAR REQUEST sent to: %u@%.8x\n",
+	u2up_log_info("(node: %u@%.8x with tmr=%p) NEAR REQUEST sent to: %u@%.8x\n",
 			id, addr, tmr, destCtact->myself->id, destCtact->myself->addr);
 
 	return 0;
@@ -406,14 +436,14 @@ static int send_protocol_near_req_msg(evmConsumerStruct *consumer, u2upNodeOwnCt
 
 static int send_protocol_near_repl_msg(evmConsumerStruct *consumer, u2upNodeOwnCtactStruct *destCtact, unsigned int id, uint32_t addr, void *ref)
 {
-	evm_log_info("(entry) consumer=%p, destCtact=%p, from=%u@%.8x, ref=%p\n", consumer, destCtact, id, addr, ref);
+	u2up_log_info("(entry) consumer=%p, destCtact=%p, from=%u@%.8x, ref=%p\n", consumer, destCtact, id, addr, ref);
 
 	if ((consumer == NULL) || (destCtact == NULL))
 		return -1;
 
 	if (send_protocol_msg(consumer, msgid_near_repl_ptr, destCtact, id, addr, ref) != 0)
 		return -1;
-	evm_log_info("(contact: %u@%.8x with ref=%p) NEAR REPLY sent to: %u@%.8x\n",
+	u2up_log_info("(contact: %u@%.8x with ref=%p) NEAR REPLY sent to: %u@%.8x\n",
 			id, addr, ref, destCtact->myself->id, destCtact->myself->addr);
 
 	return 0;
@@ -425,7 +455,7 @@ static int evProtocolInitMsg(evmConsumerStruct *consumer, evmMessageStruct *msg)
 	u2upNodeOwnCtactStruct *ownCtact;
 	u2upNodeOwnCtactStruct *destCtact;
 	u2upNodeRingContactStruct *contact = NULL;
-	evm_log_info("(cb entry) msg=%p\n", msg);
+	u2up_log_info("(cb entry) msg=%p\n", msg);
 
 	if ((consumer == NULL) || (msg == NULL))
 		return -1;
@@ -436,7 +466,7 @@ static int evProtocolInitMsg(evmConsumerStruct *consumer, evmMessageStruct *msg)
 	if ((contact = (u2upNodeRingContactStruct *)evm_message_data_get(msg)) == NULL)
 		return -1;
 
-	evm_log_info("(node: %u@%.8x) INIT msg received: contact: %u@%.8x\n", ownCtact->myself->id, ownCtact->myself->addr, contact->id, contact->addr);
+	u2up_log_info("(node: %u@%.8x) INIT msg received: contact: %u@%.8x\n", ownCtact->myself->id, ownCtact->myself->addr, contact->id, contact->addr);
 
 	insertNodeContact(ownCtact, contact->id, contact->addr);
 
@@ -455,7 +485,7 @@ static int handleTmrProtoRun(evmConsumerStruct *consumer, evmTimerStruct *tmr)
 	u2upNetNodeStruct *node, *dest_node;
 	u2upNodeOwnCtactStruct *ownCtact;
 	u2upNodeRingContactStruct *tmp = NULL;
-	evm_log_info("(cb entry) tmr=%p\n", tmr);
+	u2up_log_info("(cb entry) tmr=%p\n", tmr);
 
 	if ((ownCtact = (u2upNodeOwnCtactStruct *)evm_timer_ctx_get(tmr)) == NULL)
 		return -1;
@@ -469,11 +499,11 @@ static int handleTmrProtoRun(evmConsumerStruct *consumer, evmTimerStruct *tmr)
 #endif
 
 	if (node->active != U2UP_NET_TRUE) {
-		evm_log_info("(node: %u@%.8x disabled) PROTO RUN ignored\n", ownCtact->myself->id, ownCtact->myself->addr);
+		u2up_log_info("(node: %u@%.8x disabled) PROTO RUN ignored\n", ownCtact->myself->id, ownCtact->myself->addr);
 		return -1;
 	}
 
-	evm_log_info("(node: %u@%.8x) PROTO RUN started\n", ownCtact->myself->id, ownCtact->myself->addr);
+	u2up_log_info("(node: %u@%.8x) PROTO RUN started\n", ownCtact->myself->id, ownCtact->myself->addr);
 
 #if 0
 	/*set protocol timeout to find nearest nodes*/
@@ -507,12 +537,12 @@ static int handleTmrWaitRepl(evmConsumerStruct *consumer, evmTimerStruct *tmr)
 {
 	u2upProtocolTmrCtxStruct *tmrCtx;
 	u2upNodeOwnCtactStruct *ownCtact;
-	evm_log_info("(cb entry) tmr=%p\n", tmr);
+	u2up_log_info("(cb entry) tmr=%p\n", tmr);
 
 	if ((tmrCtx = (u2upProtocolTmrCtxStruct *)evm_timer_ctx_get(tmr)) == NULL)
 		return -1;
 
-	evm_log_info(
+	u2up_log_info(
 		"(node: %u@%.8x, tmr=%p) WAIT REPLY expired (expected from: %u@%.8x)\n",
 		tmrCtx->src_id, tmrCtx->src_addr, tmr, tmrCtx->dst_id, tmrCtx->dst_addr
 	);
@@ -532,7 +562,7 @@ static int evProtocolRandomReqMsg(evmConsumerStruct *consumer, evmMessageStruct 
 	u2upNodeOwnCtactStruct *destCtact;
 	u2upProtocolMsgDataStruct *data = NULL;
 	u2upNodeRingContactStruct *random_contact = NULL;
-	evm_log_info("(cb entry) msg=%p\n", msg);
+	u2up_log_info("(cb entry) msg=%p\n", msg);
 
 	if ((consumer == NULL) || (msg == NULL))
 		return -1;
@@ -545,14 +575,14 @@ static int evProtocolRandomReqMsg(evmConsumerStruct *consumer, evmMessageStruct 
 		return -1;
 
 	if (node->active != U2UP_NET_TRUE) {
-		evm_log_info("(node: %u@%.8x disabled) RANDOM REQUEST msg ignored\n", ownCtact->myself->id, ownCtact->myself->addr);
+		u2up_log_info("(node: %u@%.8x disabled) RANDOM REQUEST msg ignored\n", ownCtact->myself->id, ownCtact->myself->addr);
 		return -1;
 	}
 
 	if ((data = (u2upProtocolMsgDataStruct *)evm_message_data_get(msg)) == NULL)
 		return -1;
 
-	evm_log_info(
+	u2up_log_info(
 		"(node: %u@%.8x) RANDOM REQUEST msg received (from: %u@%.8x with ref=%p)\n",
 		ownCtact->myself->id, ownCtact->myself->addr, data->id, data->addr, data->ref
 	);
@@ -577,7 +607,7 @@ static int evProtocolRandomReplMsg(evmConsumerStruct *consumer, evmMessageStruct
 {
 	u2upNodeOwnCtactStruct *ownCtact;
 	u2upProtocolMsgDataStruct *data = NULL;
-	evm_log_info("(cb entry) msg=%p\n", msg);
+	u2up_log_info("(cb entry) msg=%p\n", msg);
 
 	if ((consumer == NULL) || (msg == NULL))
 		return -1;
@@ -589,7 +619,7 @@ static int evProtocolRandomReplMsg(evmConsumerStruct *consumer, evmMessageStruct
 	if ((data = (u2upProtocolMsgDataStruct *)evm_message_data_get(msg)) == NULL)
 		return -1;
 
-	evm_log_info(
+	u2up_log_info(
 		"(node: %u@%.8x) RANDOM REPLY msg received: (contact: %u@%.8x, ref=%p)\n",
 		ownCtact->myself->id, ownCtact->myself->addr, data->id, data->addr, data->ref
 	);
@@ -609,7 +639,7 @@ static int evProtocolNearReqMsg(evmConsumerStruct *consumer, evmMessageStruct *m
 	u2upNodeOwnCtactStruct *destCtact;
 	u2upProtocolMsgDataStruct *data = NULL;
 	u2upNodeRingContactStruct *near_contact = NULL;
-	evm_log_info("(cb entry) msg=%p\n", msg);
+	u2up_log_info("(cb entry) msg=%p\n", msg);
 
 	if ((consumer == NULL) || (msg == NULL))
 		return -1;
@@ -622,14 +652,14 @@ static int evProtocolNearReqMsg(evmConsumerStruct *consumer, evmMessageStruct *m
 		return -1;
 
 	if (node->active != U2UP_NET_TRUE) {
-		evm_log_info("(node: %u@%.8x disabled) NEAR REQUEST msg ignored\n", ownCtact->myself->id, ownCtact->myself->addr);
+		u2up_log_info("(node: %u@%.8x disabled) NEAR REQUEST msg ignored\n", ownCtact->myself->id, ownCtact->myself->addr);
 		return -1;
 	}
 
 	if ((data = (u2upProtocolMsgDataStruct *)evm_message_data_get(msg)) == NULL)
 		return -1;
 
-	evm_log_info(
+	u2up_log_info(
 		"(node: %u@%.8x) NEAR REQUEST msg received (from: %u@%.8x with ref=%p)\n",
 		ownCtact->myself->id, ownCtact->myself->addr, data->id, data->addr, data->ref
 	);
@@ -654,7 +684,7 @@ static int evProtocolNearReplMsg(evmConsumerStruct *consumer, evmMessageStruct *
 {
 	u2upNodeOwnCtactStruct *ownCtact;
 	u2upProtocolMsgDataStruct *data = NULL;
-	evm_log_info("(cb entry) msg=%p\n", msg);
+	u2up_log_info("(cb entry) msg=%p\n", msg);
 
 	if ((consumer == NULL) || (msg == NULL))
 		return -1;
@@ -666,7 +696,7 @@ static int evProtocolNearReplMsg(evmConsumerStruct *consumer, evmMessageStruct *
 	if ((data = (u2upProtocolMsgDataStruct *)evm_message_data_get(msg)) == NULL)
 		return -1;
 
-	evm_log_info(
+	u2up_log_info(
 		"(node: %u@%.8x) NEAR REPLY msg received: (contact: %u@%.8x, ref=%p)\n",
 		ownCtact->myself->id, ownCtact->myself->addr, data->id, data->addr, data->ref
 	);
@@ -720,7 +750,7 @@ int dump_u2up_net_ring(u2upNetRingHeadStruct *ring, char *buff, int size)
 		abort();
 
 	asprintf(&pathname, "%s_%s_%.8u.gv", outfile, start_time, secs);
-	evm_log_notice("(Write file: %s)\n", pathname);
+	u2up_log_notice("(Write file: %s)\n", pathname);
 	if (buff != NULL) {
 		snprintf(buff, size, "Dump u2upNet to: '%s'", pathname);
 	}
@@ -892,18 +922,18 @@ static int handleTmrAuthBatch(evmConsumerStruct *consumer, evmTimerStruct *tmr)
 	evmTmridStruct *tmrid_ptr;
 	u2upNetRingAddrStruct *ringAddr;
 	u2upNodeOwnCtactStruct *ownCtact;
-	evm_log_info("(cb entry) tmr=%p\n", tmr);
+	u2up_log_info("(cb entry) tmr=%p\n", tmr);
 
 	secs++;
 	if (pthread_mutex_trylock(&simulation_global_mutex) == EBUSY) {
-		evm_log_info("SIGUSR1 RECEIVED!\n");
+		u2up_log_info("SIGUSR1 RECEIVED!\n");
 		dump_u2up_net_ring(&net_addr_ring, NULL, 0);
 	}
 	pthread_mutex_unlock(&simulation_global_mutex);
 
-	evm_log_debug("AUTH_BATCH timer expired!\n");
+	u2up_log_debug("AUTH_BATCH timer expired!\n");
 	if (next_node < max_nodes) {
-		evm_log_notice("(%d nodes)\n", next_node);
+		u2up_log_notice("(%d nodes)\n", next_node);
 		for (i = 0; i < batch_nodes; i++) {
 			if (next_node < max_nodes) {
 				ringAddr = generateNewNetAddr(&net_addr_ring);
@@ -935,7 +965,7 @@ static int handleTmrAuthBatch(evmConsumerStruct *consumer, evmTimerStruct *tmr)
 			}
 		}
 		if (next_node >= max_nodes) {
-			evm_log_notice("(all %d nodes created)\n", next_node);
+			u2up_log_notice("(all %d nodes created)\n", next_node);
 #if 0 /*spog - test stop of the auth thread*/
 			while (1)
 				sleep(1000);
@@ -948,7 +978,7 @@ static int handleTmrAuthBatch(evmConsumerStruct *consumer, evmTimerStruct *tmr)
 	if ((tmrid_ptr = evm_tmrid_get(evm, TMR_ID_AUTH_BATCH)) == NULL)
 		abort();
 	tmrAuthBatch = auth_start_timer(tmrAuthBatch, 1, 0, NULL, tmrid_ptr);
-	evm_log_debug("AUTH_BATCH timer set: 1 s\n");
+	u2up_log_debug("AUTH_BATCH timer set: 1 s\n");
 
 	return 0;
 }
@@ -958,64 +988,64 @@ static int simulation_evm_init(void)
 {
 	int rv = 0;
 
-	evm_log_info("(entry)\n");
+	u2up_log_info("(entry)\n");
 
 	/* Initialize event machine... */
 	if ((evm = evm_init()) != NULL) {
 		if ((rv == 0) && ((auth_consumer = evm_consumer_add(evm, EVM_CONSUMER_AUTH)) == NULL)) {
-			evm_log_error("evm_consumer_add(EVM_CONSUMER_AUTH) failed!\n");
+			u2up_log_error("evm_consumer_add(EVM_CONSUMER_AUTH) failed!\n");
 			rv = -1;
 		}
 		if ((rv == 0) && ((protocol_consumer = evm_consumer_add(evm, EVM_CONSUMER_PROTOCOL)) == NULL)) {
-			evm_log_error("evm_consumer_add(EVM_CONSUMER_PROTOCOL) failed!\n");
+			u2up_log_error("evm_consumer_add(EVM_CONSUMER_PROTOCOL) failed!\n");
 			rv = -1;
 		}
 		if ((rv == 0) && ((msgtype_ptr = evm_msgtype_add(evm, EV_TYPE_PROTOCOL_MSG)) == NULL)) {
-			evm_log_error("evm_msgtype_add() failed!\n");
+			u2up_log_error("evm_msgtype_add() failed!\n");
 			rv = -1;
 		}
 		if ((rv == 0) && ((msgid_init_ptr = evm_msgid_add(msgtype_ptr, EV_ID_PROTOCOL_MSG_INIT)) == NULL)) {
-			evm_log_error("evm_msgid_add() failed!\n");
+			u2up_log_error("evm_msgid_add() failed!\n");
 			rv = -1;
 		}
 		if ((rv == 0) && (evm_msgid_cb_handle_set(msgid_init_ptr, evProtocolInitMsg) < 0)) {
-			evm_log_error("evm_msgid_cb_handle() failed!\n");
+			u2up_log_error("evm_msgid_cb_handle() failed!\n");
 			rv = -1;
 		}
 		if ((rv == 0) && ((msgid_random_req_ptr = evm_msgid_add(msgtype_ptr, EV_ID_PROTOCOL_MSG_RANDOM_REQ)) == NULL)) {
-			evm_log_error("evm_msgid_add() failed!\n");
+			u2up_log_error("evm_msgid_add() failed!\n");
 			rv = -1;
 		}
 		if ((rv == 0) && (evm_msgid_cb_handle_set(msgid_random_req_ptr, evProtocolRandomReqMsg) < 0)) {
-			evm_log_error("evm_msgid_cb_handle() failed!\n");
+			u2up_log_error("evm_msgid_cb_handle() failed!\n");
 			rv = -1;
 		}
 		if ((rv == 0) && ((msgid_random_repl_ptr = evm_msgid_add(msgtype_ptr, EV_ID_PROTOCOL_MSG_RANDOM_REPL)) == NULL)) {
-			evm_log_error("evm_msgid_add() failed!\n");
+			u2up_log_error("evm_msgid_add() failed!\n");
 			rv = -1;
 		}
 		if ((rv == 0) && (evm_msgid_cb_handle_set(msgid_random_repl_ptr, evProtocolRandomReplMsg) < 0)) {
-			evm_log_error("evm_msgid_cb_handle() failed!\n");
+			u2up_log_error("evm_msgid_cb_handle() failed!\n");
 			rv = -1;
 		}
 		if ((rv == 0) && ((msgid_near_req_ptr = evm_msgid_add(msgtype_ptr, EV_ID_PROTOCOL_MSG_NEAR_REQ)) == NULL)) {
-			evm_log_error("evm_msgid_add() failed!\n");
+			u2up_log_error("evm_msgid_add() failed!\n");
 			rv = -1;
 		}
 		if ((rv == 0) && (evm_msgid_cb_handle_set(msgid_near_req_ptr, evProtocolNearReqMsg) < 0)) {
-			evm_log_error("evm_msgid_cb_handle() failed!\n");
+			u2up_log_error("evm_msgid_cb_handle() failed!\n");
 			rv = -1;
 		}
 		if ((rv == 0) && ((msgid_near_repl_ptr = evm_msgid_add(msgtype_ptr, EV_ID_PROTOCOL_MSG_NEAR_REPL)) == NULL)) {
-			evm_log_error("evm_msgid_add() failed!\n");
+			u2up_log_error("evm_msgid_add() failed!\n");
 			rv = -1;
 		}
 		if ((rv == 0) && (evm_msgid_cb_handle_set(msgid_near_repl_ptr, evProtocolNearReplMsg) < 0)) {
-			evm_log_error("evm_msgid_cb_handle() failed!\n");
+			u2up_log_error("evm_msgid_cb_handle() failed!\n");
 			rv = -1;
 		}
 	} else {
-		evm_log_error("evm_init() failed!\n");
+		u2up_log_error("evm_init() failed!\n");
 		rv = -1;
 	}
 
@@ -1027,7 +1057,7 @@ static void * simulation_protocol_run(void *arg)
 {
 	evmConsumerStruct *consumer;
 
-	evm_log_info("(entry)\n");
+	u2up_log_info("(entry)\n");
 
 	if (arg == NULL)
 		return NULL;
@@ -1036,21 +1066,21 @@ static void * simulation_protocol_run(void *arg)
 
 	/* Prepare PROTO_RUN timer */
 	if ((tmridProtoRun = evm_tmrid_add(evm, TMR_ID_PROTO_RUN)) == NULL) {
-		evm_log_error("evm_tmrid_add() failed!\n");
+		u2up_log_error("evm_tmrid_add() failed!\n");
 		abort();
 	}
 	if (evm_tmrid_cb_handle_set(tmridProtoRun, handleTmrProtoRun) < 0) {
-		evm_log_error("evm_tmrid_cb_handle_set() failed!\n");
+		u2up_log_error("evm_tmrid_cb_handle_set() failed!\n");
 		abort();
 	}
 
 	/* Prepare WAIT_REPLY timer */
 	if ((tmridWaitRepl = evm_tmrid_add(evm, TMR_ID_WAIT_REPL)) == NULL) {
-		evm_log_error("evm_tmrid_add() failed!\n");
+		u2up_log_error("evm_tmrid_add() failed!\n");
 		abort();
 	}
 	if (evm_tmrid_cb_handle_set(tmridWaitRepl, handleTmrWaitRepl) < 0) {
-		evm_log_error("evm_tmrid_cb_handle_set() failed!\n");
+		u2up_log_error("evm_tmrid_cb_handle_set() failed!\n");
 		abort();
 	}
 	/*
@@ -1067,31 +1097,31 @@ static int simulation_authority_run(void)
 	pthread_attr_t attr;
 	pthread_t protocol_thread;
 	evmTmridStruct *tmrid_ptr;
-	evm_log_info("(entry)\n");
+	u2up_log_info("(entry)\n");
 
 	/* Create additional protocol thread */
 	if ((rv = pthread_attr_init(&attr)) != 0)
-		evm_log_return_system_err("pthread_attr_init()\n");
+		u2up_log_return_system_err("pthread_attr_init()\n");
 
 	if ((rv = pthread_create(&protocol_thread, &attr, simulation_protocol_run, (void *)protocol_consumer)) != 0)
-		evm_log_return_system_err("pthread_create()\n");
-	evm_log_debug("pthread_create() rv=%d\n", rv);
+		u2up_log_return_system_err("pthread_create()\n");
+	u2up_log_debug("pthread_create() rv=%d\n", rv);
 
 	/* Prepare AUTH_BATCH periodic timer */
 	if ((tmrid_ptr = evm_tmrid_add(evm, TMR_ID_AUTH_BATCH)) == NULL) {
-		evm_log_error("evm_tmrid_add() failed!\n");
+		u2up_log_error("evm_tmrid_add() failed!\n");
 		abort();
 	}
 	if (evm_tmrid_cb_handle_set(tmrid_ptr, handleTmrAuthBatch) < 0) {
-		evm_log_error("evm_tmrid_cb_handle_set() failed!\n");
+		u2up_log_error("evm_tmrid_cb_handle_set() failed!\n");
 		abort();
 	}
 	tmrAuthBatch = auth_start_timer(NULL, 1, 0, NULL, tmrid_ptr);
-	evm_log_notice("AUTH_BATCH timer set: 1 s\n");
+	u2up_log_notice("AUTH_BATCH timer set: 1 s\n");
 
 	/* Initialize CLI server */
 	if (simulation_clisrv_init(evm) < 0) {
-		evm_log_error("simulation_clisrv_init() failed!\n");
+		u2up_log_error("simulation_clisrv_init() failed!\n");
 		abort();
 	}
 
@@ -1117,7 +1147,7 @@ static int simulation_sighandler_install(int signum)
 	act.sa_flags = SA_SIGINFO;
 
 	if (sigaction(signum, &act, NULL) < 0)
-		evm_log_return_system_err("sigaction() for signum %d\n", signum);
+		u2up_log_return_system_err("sigaction() for signum %d\n", signum);
 
 	return 0;
 }
@@ -1137,13 +1167,13 @@ int main(int argc, char *argv[])
 	log_mask = LOG_MASK(LOG_EMERG) | LOG_MASK(LOG_ALERT) | LOG_MASK(LOG_CRIT) | LOG_MASK(LOG_ERR);
 
 	/* Setup LOG_MASK according to startup arguments! */
-	if (evmlog_normal) {
+	if (U2UP_LOG_GET_NORMAL()) {
 		log_mask |= LOG_MASK(LOG_WARNING);
 		log_mask |= LOG_MASK(LOG_NOTICE);
 	}
-	if ((evmlog_verbose) || (evmlog_trace))
+	if ((U2UP_LOG_GET_VERBOSE()) || (U2UP_LOG_GET_TRACE()))
 		log_mask |= LOG_MASK(LOG_INFO);
-	if (evmlog_debug)
+	if (U2UP_LOG_GET_DEBUG())
 		log_mask |= LOG_MASK(LOG_DEBUG);
 
 	setlogmask(log_mask);
