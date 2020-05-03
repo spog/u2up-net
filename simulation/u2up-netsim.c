@@ -75,20 +75,21 @@ static void usage_help(char *argv[])
 	printf("Usage:\n");
 	printf("\t%s [options]\n", argv[0]);
 	printf("options:\n");
-	printf("\t-q, --quiet              Disable all output.\n");
-	printf("\t-v, --verbose            Enable verbose output.\n");
 	printf("\t-a, --auto-dump          Automatically dump u2up network ring on node changes.\n");
 	printf("\t-b, --batch-nodes        Number of nodes to be created in a batch (default=%u).\n", batch_nodes);
 	printf("\t-m, --max-nodes          Maximum number of all nodes to be created (default=%u).\n", max_nodes);
 	printf("\t-o, --outfile            Output [path/]filename prefix (default=%s).\n", default_outfile);
+	printf("\t-q, --log-quiet          Disable all output.\n");
+	printf("\t-v, --log-verbose        Enable verbose output.\n");
 #if (U2UP_LOG_MODULE_TRACE != 0)
-	printf("\t-t, --trace              Enable trace output.\n");
+	printf("\t-t, --log-trace          Enable trace output.\n");
 #endif
 #if (U2UP_LOG_MODULE_DEBUG != 0)
-	printf("\t-g, --debug              Enable debug output.\n");
+	printf("\t-g, --log-debug          Enable debug output.\n");
 #endif
-	printf("\t-s, --syslog             Enable syslog output (instead of stdout, stderr).\n");
-	printf("\t-n, --no-header          No U2UP_LOG header added to every u2up_log_... output.\n");
+	printf("\t-s, --log-syslog         Enable syslog output (instead of stdout, stderr).\n");
+	printf("\t-n, --log-no-header      No U2UP_LOG header added to every u2up_log_... output.\n");
+	printf("\t-f, --log-filter NAME    Disable outout from U2UP_LOG module NAME prefix.\n");
 	printf("\t-h, --help               Displays this text.\n");
 }
 
@@ -99,55 +100,38 @@ static int usage_check(int argc, char *argv[])
 	while (1) {
 		int option_index = 0;
 		static struct option long_options[] = {
-			{"quiet", 0, 0, 'q'},
-			{"verbose", 0, 0, 'v'},
 			{"auto-dump", 0, 0, 'a'},
 			{"batch-nodes", 1, 0, 'b'},
 			{"max-nodes", 1, 0, 'm'},
 			{"outfile", 1, 0, 'o'},
+			{"log-quiet", 0, 0, 'q'},
+			{"log-verbose", 0, 0, 'v'},
 #if (U2UP_LOG_MODULE_TRACE != 0)
-			{"trace", 0, 0, 't'},
+			{"log-trace", 0, 0, 't'},
 #endif
 #if (U2UP_LOG_MODULE_DEBUG != 0)
-			{"debug", 0, 0, 'g'},
+			{"log-debug", 0, 0, 'g'},
 #endif
-			{"no-header", 0, 0, 'n'},
-			{"syslog", 0, 0, 's'},
+			{"log-syslog", 0, 0, 's'},
+			{"log-no-header", 0, 0, 'n'},
+			{"log-filter", 1, 0, 'f'},
 			{"help", 0, 0, 'h'},
 			{0, 0, 0, 0}
 		};
 
 #if (U2UP_LOG_MODULE_TRACE != 0) && (U2UP_LOG_MODULE_DEBUG != 0)
-		c = getopt_long(argc, argv, "qvab:m:o:tgnsh", long_options, &option_index);
+		c = getopt_long(argc, argv, "ab:m:o:qvtgsnf:h", long_options, &option_index);
 #elif (U2UP_LOG_MODULE_TRACE == 0) && (U2UP_LOG_MODULE_DEBUG != 0)
-		c = getopt_long(argc, argv, "qvab:m:o:gnsh", long_options, &option_index);
+		c = getopt_long(argc, argv, "ab:m:o:qvgsnf:h", long_options, &option_index);
 #elif (U2UP_LOG_MODULE_TRACE != 0) && (U2UP_LOG_MODULE_DEBUG == 0)
-		c = getopt_long(argc, argv, "qvab:m:o:tnsh", long_options, &option_index);
+		c = getopt_long(argc, argv, "ab:m:o:qvtsnf:h", long_options, &option_index);
 #else
-		c = getopt_long(argc, argv, "qvab:m:o:nsh", long_options, &option_index);
+		c = getopt_long(argc, argv, "ab:m:o:qvsnf:h", long_options, &option_index);
 #endif
 		if (c == -1)
 			break;
 
 		switch (c) {
-		case 'q':
-			U2UP_LOG_SET_NORMAL(0);
-			U2UP_LOG_SET_NORMAL2(EVM_CORE, 0);
-			U2UP_LOG_SET_NORMAL2(EVM_MSGS, 0);
-			U2UP_LOG_SET_NORMAL2(EVM_TMRS, 0);
-			U2UP_LOG_SET_NORMAL2(U2NETCLI, 0);
-			U2UP_LOG_SET_NORMAL2(U2CLISRV, 0);
-			break;
-
-		case 'v':
-			U2UP_LOG_SET_VERBOSE(1);
-			U2UP_LOG_SET_VERBOSE2(EVM_CORE, 1);
-			U2UP_LOG_SET_VERBOSE2(EVM_MSGS, 1);
-			U2UP_LOG_SET_VERBOSE2(EVM_TMRS, 1);
-			U2UP_LOG_SET_VERBOSE2(U2NETCLI, 1);
-			U2UP_LOG_SET_VERBOSE2(U2CLISRV, 1);
-			break;
-
 		case 'a':
 			auto_dump = 1;
 			break;
@@ -165,6 +149,24 @@ static int usage_check(int argc, char *argv[])
 		case 'o':
 			printf("outfile: optarg=%s\n", optarg);
 			asprintf(&outfile, "%s_%.4d-%.2d-%.2d-%.2d%.2d", optarg, start.tm_year + 1900, start.tm_mon + 1, start.tm_mday, start.tm_hour, start.tm_min);
+			break;
+
+		case 'q':
+			U2UP_LOG_SET_QUIET(1);
+			U2UP_LOG_SET_QUIET2(EVM_CORE, 1);
+			U2UP_LOG_SET_QUIET2(EVM_MSGS, 1);
+			U2UP_LOG_SET_QUIET2(EVM_TMRS, 1);
+			U2UP_LOG_SET_QUIET2(U2NETCLI, 1);
+			U2UP_LOG_SET_QUIET2(U2CLISRV, 1);
+			break;
+
+		case 'v':
+			U2UP_LOG_SET_VERBOSE(1);
+			U2UP_LOG_SET_VERBOSE2(EVM_CORE, 1);
+			U2UP_LOG_SET_VERBOSE2(EVM_MSGS, 1);
+			U2UP_LOG_SET_VERBOSE2(EVM_TMRS, 1);
+			U2UP_LOG_SET_VERBOSE2(U2NETCLI, 1);
+			U2UP_LOG_SET_VERBOSE2(U2CLISRV, 1);
 			break;
 
 #if (U2UP_LOG_MODULE_TRACE != 0)
@@ -189,6 +191,15 @@ static int usage_check(int argc, char *argv[])
 			break;
 #endif
 
+		case 's':
+			U2UP_LOG_SET_SYSLOG(1);
+			U2UP_LOG_SET_SYSLOG2(EVM_CORE, 1);
+			U2UP_LOG_SET_SYSLOG2(EVM_MSGS, 1);
+			U2UP_LOG_SET_SYSLOG2(EVM_TMRS, 1);
+			U2UP_LOG_SET_SYSLOG2(U2NETCLI, 1);
+			U2UP_LOG_SET_SYSLOG2(U2CLISRV, 1);
+			break;
+
 		case 'n':
 			U2UP_LOG_SET_HEADER(0);
 			U2UP_LOG_SET_HEADER2(EVM_CORE, 0);
@@ -198,13 +209,34 @@ static int usage_check(int argc, char *argv[])
 			U2UP_LOG_SET_HEADER2(U2CLISRV, 0);
 			break;
 
-		case 's':
-			U2UP_LOG_SET_SYSLOG(1);
-			U2UP_LOG_SET_SYSLOG2(EVM_CORE, 1);
-			U2UP_LOG_SET_SYSLOG2(EVM_MSGS, 1);
-			U2UP_LOG_SET_SYSLOG2(EVM_TMRS, 1);
-			U2UP_LOG_SET_SYSLOG2(U2NETCLI, 1);
-			U2UP_LOG_SET_SYSLOG2(U2CLISRV, 1);
+		case 'f': {
+				size_t optlen = strlen(optarg);
+				printf("no-module: optlen=%zd, optarg=%s\n", optlen, optarg);
+				if (strlen(U2UP_LOG_GET_NAME()) >= optlen)
+					if (strncmp(U2UP_LOG_GET_NAME(), optarg, optlen) == 0) {
+						U2UP_LOG_SET_QUIET(1);
+					}
+				if (strlen(U2UP_LOG_GET_NAME2(EVM_CORE)) >= optlen)
+					if (strncmp(U2UP_LOG_GET_NAME2(EVM_CORE), optarg, optlen) == 0) {
+						U2UP_LOG_SET_QUIET2(EVM_CORE, 1);
+					}
+				if (strlen(U2UP_LOG_GET_NAME2(EVM_MSGS)) >= optlen)
+					if (strncmp(U2UP_LOG_GET_NAME2(EVM_MSGS), optarg, optlen) == 0) {
+						U2UP_LOG_SET_QUIET2(EVM_MSGS, 1);
+					}
+				if (strlen(U2UP_LOG_GET_NAME2(EVM_TMRS)) >= optlen)
+					if (strncmp(U2UP_LOG_GET_NAME2(EVM_TMRS), optarg, optlen) == 0) {
+						U2UP_LOG_SET_QUIET2(EVM_TMRS, 1);
+					}
+				if (strlen(U2UP_LOG_GET_NAME2(U2NETCLI)) >= optlen)
+					if (strncmp(U2UP_LOG_GET_NAME2(U2NETCLI), optarg, optlen) == 0) {
+						U2UP_LOG_SET_QUIET2(U2NETCLI, 1);
+					}
+				if (strlen(U2UP_LOG_GET_NAME2(U2CLISRV)) >= optlen)
+					if (strncmp(U2UP_LOG_GET_NAME2(U2CLISRV), optarg, optlen) == 0) {
+						U2UP_LOG_SET_QUIET2(U2CLISRV, 1);
+					}
+			}
 			break;
 
 		case 'h':
