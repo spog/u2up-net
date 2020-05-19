@@ -256,7 +256,7 @@ int main(int argc, char *argv[])
 	}
 
 	/* Process CLI commands */
-	if (processCliCmds(sockfd, socketSendReceive) < 0) {
+	if (processCliCmds("netsim-cli> ", sockfd, socketSendReceive) < 0) {
 		u2up_log_error("processCliCmds()\n");
 		close(sockfd);
 		exit(EXIT_FAILURE);
