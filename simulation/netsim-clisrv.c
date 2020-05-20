@@ -58,6 +58,8 @@ static evmMsgtypeStruct *msgtype_ptr;
 static evmMsgidStruct *msgid_init_ptr;
 static evmTmridStruct *tmridClisrvCmdTout;
 
+static struct clisrv_conn *clisrvConns;
+
 static int clisrv_lsd;
 static struct pollfd *clisrvFds;
 static int clisrvNfds = 1;
@@ -70,8 +72,8 @@ static sigset_t clisrv_sigmask;
 static char *clisrv_cmds[] = {
 	"help",
 	"dump [prefix=%s]",
-	"disable {addr=%8x | id=%u}",
-	"enable {all | addr=%8x | id=%u}",
+	"node disable {addr=%8x | id=%u}",
+	"node enable {all | addr=%8x | id=%u}",
 	"quit",
 #if 0 /*test*/
 	"test1 {a|b c|d}",
@@ -83,8 +85,8 @@ static char *clisrv_cmds[] = {
 
 static int help_handle(clisrv_token_struct *curr_tokens, char *buff, int size);
 static int dump_handle(clisrv_token_struct *curr_tokens, char *buff, int size);
-static int disable_handle(clisrv_token_struct *curr_tokens, char *buff, int size);
-static int enable_handle(clisrv_token_struct *curr_tokens, char *buff, int size);
+static int node_disable_handle(clisrv_token_struct *curr_tokens, char *buff, int size);
+static int node_enable_handle(clisrv_token_struct *curr_tokens, char *buff, int size);
 static int quit_handle(clisrv_token_struct *curr_tokens, char *buff, int size);
 #if 0 /*test*/
 static int test1_handle(clisrv_token_struct *curr_tokens, char *buff, int size);
@@ -95,8 +97,8 @@ static int test3_handle(clisrv_token_struct *curr_tokens, char *buff, int size);
 static int (*cmd_handle[])(clisrv_token_struct *curr_tokens, char *buff, int size) = {
 	help_handle,
 	dump_handle,
-	disable_handle,
-	enable_handle,
+	node_disable_handle,
+	node_enable_handle,
 	quit_handle,
 #if 0 /*test*/
 	test1_handle,
@@ -133,7 +135,7 @@ static int dump_handle(clisrv_token_struct *curr_tokens, char *buff, int size)
 	return 0;
 }
 
-static int disable_handle(clisrv_token_struct *curr_tokens, char *buff, int size)
+static int node_disable_handle(clisrv_token_struct *curr_tokens, char *buff, int size)
 {
 	clisrv_token_struct *addr_token;
 	clisrv_token_struct *id_token;
@@ -170,7 +172,7 @@ static int disable_handle(clisrv_token_struct *curr_tokens, char *buff, int size
 	return 0;
 }
 
-static int enable_handle(clisrv_token_struct *curr_tokens, char *buff, int size)
+static int node_enable_handle(clisrv_token_struct *curr_tokens, char *buff, int size)
 {
 	clisrv_token_struct *all_token;
 	clisrv_token_struct *addr_token;
