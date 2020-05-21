@@ -273,6 +273,314 @@ static int usage_check(int argc, char *argv[])
 	return 0;
 }
 
+int u2up_log_list_modules(char *buff, int size)
+{
+	int room = size - strlen(buff) - 1;
+	if (room > 0) {
+		strncat(buff, "U2NETSIM EVM_CORE EVM_MSGS EVM_TMRS U2NETCLI U2CLISRV", room);
+		return 0;
+	}
+	return -1;
+}
+
+int u2up_log_set(char *module, char *param)
+{
+	if (module == NULL) {
+		u2up_log_error("module=%p\n", module);
+		return -1;
+	}
+	if (param == NULL) {
+		u2up_log_error("param=%p\n", param);
+		return -1;
+	}
+	if (
+		(strcmp(module, "U2NETSIM") != 0) &&
+		(strcmp(module, "EVM_CORE") != 0) &&
+		(strcmp(module, "EVM_MSGS") != 0) &&
+		(strcmp(module, "EVM_TMRS") != 0) &&
+		(strcmp(module, "U2NETCLI") != 0) &&
+		(strcmp(module, "U2CLISRV") != 0)
+	) {
+		u2up_log_error("Invalid log module: '%s'\n", module);
+		return -1;
+	}
+
+	if (strcmp(param, "quiet") == 0) {
+		if (strcmp(module, "U2NETSIM") == 0) {
+			U2UP_LOG_SET_QUIET2(U2NETSIM, 1);
+		} else
+		if (strcmp(module, "EVM_CORE") == 0) {
+			U2UP_LOG_SET_QUIET2(EVM_CORE, 1);
+		} else
+		if (strcmp(module, "EVM_MSGS") == 0) {
+			U2UP_LOG_SET_QUIET2(EVM_MSGS, 1);
+		} else
+		if (strcmp(module, "EVM_TMRS") == 0) {
+			U2UP_LOG_SET_QUIET2(EVM_TMRS, 1);
+		} else
+		if (strcmp(module, "U2NETCLI") == 0) {
+			U2UP_LOG_SET_QUIET2(U2NETCLI, 1);
+		} else
+		if (strcmp(module, "U2CLISRV") == 0) {
+			U2UP_LOG_SET_QUIET2(U2CLISRV, 1);
+		}
+	} else
+	if (strcmp(param, "verbose") == 0) {
+		if (strcmp(module, "U2NETSIM") == 0) {
+			U2UP_LOG_SET_VERBOSE2(U2NETSIM, 1);
+		} else
+		if (strcmp(module, "EVM_CORE") == 0) {
+			U2UP_LOG_SET_VERBOSE2(EVM_CORE, 1);
+		} else
+		if (strcmp(module, "EVM_MSGS") == 0) {
+			U2UP_LOG_SET_VERBOSE2(EVM_MSGS, 1);
+		} else
+		if (strcmp(module, "EVM_TMRS") == 0) {
+			U2UP_LOG_SET_VERBOSE2(EVM_TMRS, 1);
+		} else
+		if (strcmp(module, "U2NETCLI") == 0) {
+			U2UP_LOG_SET_VERBOSE2(U2NETCLI, 1);
+		} else
+		if (strcmp(module, "U2CLISRV") == 0) {
+			U2UP_LOG_SET_VERBOSE2(U2CLISRV, 1);
+		}
+	} else
+	if (strcmp(param, "trace") == 0) {
+		if (strcmp(module, "U2NETSIM") == 0) {
+			U2UP_LOG_SET_TRACE2(U2NETSIM, 1);
+		} else
+		if (strcmp(module, "EVM_CORE") == 0) {
+			U2UP_LOG_SET_TRACE2(EVM_CORE, 1);
+		} else
+		if (strcmp(module, "EVM_MSGS") == 0) {
+			U2UP_LOG_SET_TRACE2(EVM_MSGS, 1);
+		} else
+		if (strcmp(module, "EVM_TMRS") == 0) {
+			U2UP_LOG_SET_TRACE2(EVM_TMRS, 1);
+		} else
+		if (strcmp(module, "U2NETCLI") == 0) {
+			U2UP_LOG_SET_TRACE2(U2NETCLI, 1);
+		} else
+		if (strcmp(module, "U2CLISRV") == 0) {
+			U2UP_LOG_SET_TRACE2(U2CLISRV, 1);
+		}
+	} else
+	if (strcmp(param, "debug") == 0) {
+		if (strcmp(module, "U2NETSIM") == 0) {
+			U2UP_LOG_SET_DEBUG2(U2NETSIM, 1);
+		} else
+		if (strcmp(module, "EVM_CORE") == 0) {
+			U2UP_LOG_SET_DEBUG2(EVM_CORE, 1);
+		} else
+		if (strcmp(module, "EVM_MSGS") == 0) {
+			U2UP_LOG_SET_DEBUG2(EVM_MSGS, 1);
+		} else
+		if (strcmp(module, "EVM_TMRS") == 0) {
+			U2UP_LOG_SET_DEBUG2(EVM_TMRS, 1);
+		} else
+		if (strcmp(module, "U2NETCLI") == 0) {
+			U2UP_LOG_SET_DEBUG2(U2NETCLI, 1);
+		} else
+		if (strcmp(module, "U2CLISRV") == 0) {
+			U2UP_LOG_SET_DEBUG2(U2CLISRV, 1);
+		}
+	} else
+	if (strcmp(param, "syslog") == 0) {
+		if (strcmp(module, "U2NETSIM") == 0) {
+			U2UP_LOG_SET_SYSLOG2(U2NETSIM, 1);
+		} else
+		if (strcmp(module, "EVM_CORE") == 0) {
+			U2UP_LOG_SET_SYSLOG2(EVM_CORE, 1);
+		} else
+		if (strcmp(module, "EVM_MSGS") == 0) {
+			U2UP_LOG_SET_SYSLOG2(EVM_MSGS, 1);
+		} else
+		if (strcmp(module, "EVM_TMRS") == 0) {
+			U2UP_LOG_SET_SYSLOG2(EVM_TMRS, 1);
+		} else
+		if (strcmp(module, "U2NETCLI") == 0) {
+			U2UP_LOG_SET_SYSLOG2(U2NETCLI, 1);
+		} else
+		if (strcmp(module, "U2CLISRV") == 0) {
+			U2UP_LOG_SET_SYSLOG2(U2CLISRV, 1);
+		}
+	} else
+	if (strcmp(param, "header") == 0) {
+		if (strcmp(module, "U2NETSIM") == 0) {
+			U2UP_LOG_SET_HEADER2(U2NETSIM, 1);
+		} else
+		if (strcmp(module, "EVM_CORE") == 0) {
+			U2UP_LOG_SET_HEADER2(EVM_CORE, 1);
+		} else
+		if (strcmp(module, "EVM_MSGS") == 0) {
+			U2UP_LOG_SET_HEADER2(EVM_MSGS, 1);
+		} else
+		if (strcmp(module, "EVM_TMRS") == 0) {
+			U2UP_LOG_SET_HEADER2(EVM_TMRS, 1);
+		} else
+		if (strcmp(module, "U2NETCLI") == 0) {
+			U2UP_LOG_SET_HEADER2(U2NETCLI, 1);
+		} else
+		if (strcmp(module, "U2CLISRV") == 0) {
+			U2UP_LOG_SET_HEADER2(U2CLISRV, 1);
+		}
+	} else {
+		u2up_log_error("Invalid log module parameter: '%s'\n", param);
+		return -1;
+	}
+
+	return 0;
+}
+
+int u2up_log_reset(char *module, char *param)
+{
+	if (module == NULL) {
+		u2up_log_error("module=%p\n", module);
+		return -1;
+	}
+	if (param == NULL) {
+		u2up_log_error("param=%p\n", param);
+		return -1;
+	}
+	if (
+		(strcmp(module, "U2NETSIM") != 0) &&
+		(strcmp(module, "EVM_CORE") != 0) &&
+		(strcmp(module, "EVM_MSGS") != 0) &&
+		(strcmp(module, "EVM_TMRS") != 0) &&
+		(strcmp(module, "U2NETCLI") != 0) &&
+		(strcmp(module, "U2CLISRV") != 0)
+	) {
+		u2up_log_error("Invalid log module: '%s'\n", module);
+		return -1;
+	}
+
+	if (strcmp(param, "quiet") == 0) {
+		if (strcmp(module, "U2NETSIM") == 0) {
+			U2UP_LOG_SET_QUIET2(U2NETSIM, 0);
+		} else
+		if (strcmp(module, "EVM_CORE") == 0) {
+			U2UP_LOG_SET_QUIET2(EVM_CORE, 0);
+		} else
+		if (strcmp(module, "EVM_MSGS") == 0) {
+			U2UP_LOG_SET_QUIET2(EVM_MSGS, 0);
+		} else
+		if (strcmp(module, "EVM_TMRS") == 0) {
+			U2UP_LOG_SET_QUIET2(EVM_TMRS, 0);
+		} else
+		if (strcmp(module, "U2NETCLI") == 0) {
+			U2UP_LOG_SET_QUIET2(U2NETCLI, 0);
+		} else
+		if (strcmp(module, "U2CLISRV") == 0) {
+			U2UP_LOG_SET_QUIET2(U2CLISRV, 0);
+		}
+	} else
+	if (strcmp(param, "verbose") == 0) {
+		if (strcmp(module, "U2NETSIM") == 0) {
+			U2UP_LOG_SET_VERBOSE2(U2NETSIM, 0);
+		} else
+		if (strcmp(module, "EVM_CORE") == 0) {
+			U2UP_LOG_SET_VERBOSE2(EVM_CORE, 0);
+		} else
+		if (strcmp(module, "EVM_MSGS") == 0) {
+			U2UP_LOG_SET_VERBOSE2(EVM_MSGS, 0);
+		} else
+		if (strcmp(module, "EVM_TMRS") == 0) {
+			U2UP_LOG_SET_VERBOSE2(EVM_TMRS, 0);
+		} else
+		if (strcmp(module, "U2NETCLI") == 0) {
+			U2UP_LOG_SET_VERBOSE2(U2NETCLI, 0);
+		} else
+		if (strcmp(module, "U2CLISRV") == 0) {
+			U2UP_LOG_SET_VERBOSE2(U2CLISRV, 0);
+		}
+	} else
+	if (strcmp(param, "trace") == 0) {
+		if (strcmp(module, "U2NETSIM") == 0) {
+			U2UP_LOG_SET_TRACE2(U2NETSIM, 0);
+		} else
+		if (strcmp(module, "EVM_CORE") == 0) {
+			U2UP_LOG_SET_TRACE2(EVM_CORE, 0);
+		} else
+		if (strcmp(module, "EVM_MSGS") == 0) {
+			U2UP_LOG_SET_TRACE2(EVM_MSGS, 0);
+		} else
+		if (strcmp(module, "EVM_TMRS") == 0) {
+			U2UP_LOG_SET_TRACE2(EVM_TMRS, 0);
+		} else
+		if (strcmp(module, "U2NETCLI") == 0) {
+			U2UP_LOG_SET_TRACE2(U2NETCLI, 0);
+		} else
+		if (strcmp(module, "U2CLISRV") == 0) {
+			U2UP_LOG_SET_TRACE2(U2CLISRV, 0);
+		}
+	} else
+	if (strcmp(param, "debug") == 0) {
+		if (strcmp(module, "U2NETSIM") == 0) {
+			U2UP_LOG_SET_DEBUG2(U2NETSIM, 0);
+		} else
+		if (strcmp(module, "EVM_CORE") == 0) {
+			U2UP_LOG_SET_DEBUG2(EVM_CORE, 0);
+		} else
+		if (strcmp(module, "EVM_MSGS") == 0) {
+			U2UP_LOG_SET_DEBUG2(EVM_MSGS, 0);
+		} else
+		if (strcmp(module, "EVM_TMRS") == 0) {
+			U2UP_LOG_SET_DEBUG2(EVM_TMRS, 0);
+		} else
+		if (strcmp(module, "U2NETCLI") == 0) {
+			U2UP_LOG_SET_DEBUG2(U2NETCLI, 0);
+		} else
+		if (strcmp(module, "U2CLISRV") == 0) {
+			U2UP_LOG_SET_DEBUG2(U2CLISRV, 0);
+		}
+	} else
+	if (strcmp(param, "syslog") == 0) {
+		if (strcmp(module, "U2NETSIM") == 0) {
+			U2UP_LOG_SET_SYSLOG2(U2NETSIM, 0);
+		} else
+		if (strcmp(module, "EVM_CORE") == 0) {
+			U2UP_LOG_SET_SYSLOG2(EVM_CORE, 0);
+		} else
+		if (strcmp(module, "EVM_MSGS") == 0) {
+			U2UP_LOG_SET_SYSLOG2(EVM_MSGS, 0);
+		} else
+		if (strcmp(module, "EVM_TMRS") == 0) {
+			U2UP_LOG_SET_SYSLOG2(EVM_TMRS, 0);
+		} else
+		if (strcmp(module, "U2NETCLI") == 0) {
+			U2UP_LOG_SET_SYSLOG2(U2NETCLI, 0);
+		} else
+		if (strcmp(module, "U2CLISRV") == 0) {
+			U2UP_LOG_SET_SYSLOG2(U2CLISRV, 0);
+		}
+	} else
+	if (strcmp(param, "header") == 0) {
+		if (strcmp(module, "U2NETSIM") == 0) {
+			U2UP_LOG_SET_HEADER2(U2NETSIM, 0);
+		} else
+		if (strcmp(module, "EVM_CORE") == 0) {
+			U2UP_LOG_SET_HEADER2(EVM_CORE, 0);
+		} else
+		if (strcmp(module, "EVM_MSGS") == 0) {
+			U2UP_LOG_SET_HEADER2(EVM_MSGS, 0);
+		} else
+		if (strcmp(module, "EVM_TMRS") == 0) {
+			U2UP_LOG_SET_HEADER2(EVM_TMRS, 0);
+		} else
+		if (strcmp(module, "U2NETCLI") == 0) {
+			U2UP_LOG_SET_HEADER2(U2NETCLI, 0);
+		} else
+		if (strcmp(module, "U2CLISRV") == 0) {
+			U2UP_LOG_SET_HEADER2(U2CLISRV, 0);
+		}
+	} else {
+		u2up_log_error("Invalid log module parameter: '%s'\n", param);
+		return -1;
+	}
+
+	return 0;
+}
+
 enum evm_msg_ids {
 	EV_ID_PROTOCOL_MSG_INIT = 0,
 	EV_ID_PROTOCOL_MSG_RANDOM_REQ,

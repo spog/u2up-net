@@ -135,8 +135,8 @@ static int log_list_handle(clisrv_token_struct *curr_tokens, char *buff, int siz
 
 	if ((modules_token = getCurrentToken(curr_tokens, "modules")) != NULL) {
 		printf("log list handle called (modules)!'\n");
-		clisrv_strncat(buff, "Log modules:\n", size);
-		clisrv_strncat(buff, " U2NETSIM EVM_CORE EVM_MSGS EVM_TMRS U2NETCLI U2CLISRV", size);
+		clisrv_strncat(buff, "Log modules:\n ", size);
+		u2up_log_list_modules(buff, size);
 	} else
 		printf("log list handle called (missing parameter)!'\n");
 
@@ -155,147 +155,33 @@ static int log_set_handle(clisrv_token_struct *curr_tokens, char *buff, int size
 
 	if ((module_token = getCurrentToken(curr_tokens, "module")) != NULL) {
 		if ((module_token->eqval != NULL) && (strlen(module_token->eqval) > 0)) {
-			printf("log list handle called (module=%s)!'\n", module_token->eqval);
+			printf("log set handle called (module=%s)!'\n", module_token->eqval);
 		}
 	}
 
 	if ((quiet_token = getCurrentToken(curr_tokens, "quiet")) != NULL) {
 		printf("log set handle called (quiet)!'\n");
-#if 0 /*need to be sent to the main thread*/
-		if (strcmp(module_token->eqval, "U2NETSIM") == 0) {
-			U2UP_LOG_SET_QUIET2(U2NETSIM, 1);
-		} else
-		if (strcmp(module_token->eqval, "EVM_CORE") == 0) {
-			U2UP_LOG_SET_QUIET2(EVM_CORE, 1);
-		} else
-		if (strcmp(module_token->eqval, "EVM_MSGS") == 0) {
-			U2UP_LOG_SET_QUIET2(EVM_MSGS, 1);
-		} else
-		if (strcmp(module_token->eqval, "EVM_TMRS") == 0) {
-			U2UP_LOG_SET_QUIET2(EVM_TMRS, 1);
-		} else
-#endif
-		if (strcmp(module_token->eqval, "U2NETCLI") == 0) {
-			U2UP_LOG_SET_QUIET2(U2NETCLI, 1);
-		} else
-		if (strcmp(module_token->eqval, "U2CLISRV") == 0) {
-			U2UP_LOG_SET_QUIET2(U2CLISRV, 1);
-		}
+		return u2up_log_set(module_token->eqval, "quiet");
 	} else
 	if ((verbose_token = getCurrentToken(curr_tokens, "verbose")) != NULL) {
 		printf("log set handle called (verbose)!'\n");
-#if 0 /*need to be sent to the main thread*/
-		if (strcmp(module_token->eqval, "U2NETSIM") == 0) {
-			U2UP_LOG_SET_VERBOSE2(U2NETSIM, 1);
-		} else
-		if (strcmp(module_token->eqval, "EVM_CORE") == 0) {
-			U2UP_LOG_SET_VERBOSE2(EVM_CORE, 1);
-		} else
-		if (strcmp(module_token->eqval, "EVM_MSGS") == 0) {
-			U2UP_LOG_SET_VERBOSE2(EVM_MSGS, 1);
-		} else
-		if (strcmp(module_token->eqval, "EVM_TMRS") == 0) {
-			U2UP_LOG_SET_VERBOSE2(EVM_TMRS, 1);
-		} else
-#endif
-		if (strcmp(module_token->eqval, "U2NETCLI") == 0) {
-			U2UP_LOG_SET_VERBOSE2(U2NETCLI, 1);
-		} else
-		if (strcmp(module_token->eqval, "U2CLISRV") == 0) {
-			U2UP_LOG_SET_VERBOSE2(U2CLISRV, 1);
-		}
+		return u2up_log_set(module_token->eqval, "verbose");
 	} else
 	if ((trace_token = getCurrentToken(curr_tokens, "trace")) != NULL) {
 		printf("log set handle called (trace)!'\n");
-#if 0 /*need to be sent to the main thread*/
-		if (strcmp(module_token->eqval, "U2NETSIM") == 0) {
-			U2UP_LOG_SET_TRACE2(U2NETSIM, 1);
-		} else
-		if (strcmp(module_token->eqval, "EVM_CORE") == 0) {
-			U2UP_LOG_SET_TRACE2(EVM_CORE, 1);
-		} else
-		if (strcmp(module_token->eqval, "EVM_MSGS") == 0) {
-			U2UP_LOG_SET_TRACE2(EVM_MSGS, 1);
-		} else
-		if (strcmp(module_token->eqval, "EVM_TMRS") == 0) {
-			U2UP_LOG_SET_TRACE2(EVM_TMRS, 1);
-		} else
-#endif
-		if (strcmp(module_token->eqval, "U2NETCLI") == 0) {
-			U2UP_LOG_SET_TRACE2(U2NETCLI, 1);
-		} else
-		if (strcmp(module_token->eqval, "U2CLISRV") == 0) {
-			U2UP_LOG_SET_TRACE2(U2CLISRV, 1);
-		}
+		return u2up_log_set(module_token->eqval, "trace");
 	} else
 	if ((debug_token = getCurrentToken(curr_tokens, "debug")) != NULL) {
 		printf("log set handle called (debug)!'\n");
-#if 0 /*need to be sent to the main thread*/
-		if (strcmp(module_token->eqval, "U2NETSIM") == 0) {
-			U2UP_LOG_SET_DEBUG2(U2NETSIM, 1);
-		} else
-		if (strcmp(module_token->eqval, "EVM_CORE") == 0) {
-			U2UP_LOG_SET_DEBUG2(EVM_CORE, 1);
-		} else
-		if (strcmp(module_token->eqval, "EVM_MSGS") == 0) {
-			U2UP_LOG_SET_DEBUG2(EVM_MSGS, 1);
-		} else
-		if (strcmp(module_token->eqval, "EVM_TMRS") == 0) {
-			U2UP_LOG_SET_DEBUG2(EVM_TMRS, 1);
-		} else
-#endif
-		if (strcmp(module_token->eqval, "U2NETCLI") == 0) {
-			U2UP_LOG_SET_DEBUG2(U2NETCLI, 1);
-		} else
-		if (strcmp(module_token->eqval, "U2CLISRV") == 0) {
-			U2UP_LOG_SET_DEBUG2(U2CLISRV, 1);
-		}
+		return u2up_log_set(module_token->eqval, "debug");
 	} else
 	if ((syslog_token = getCurrentToken(curr_tokens, "syslog")) != NULL) {
 		printf("log set handle called (syslog)!'\n");
-#if 0 /*need tobe sent to the main thread*/
-		if (strcmp(module_token->eqval, "U2NETSIM") == 0) {
-			U2UP_LOG_SET_SYSLOG2(U2NETSIM, 1);
-		} else
-		if (strcmp(module_token->eqval, "EVM_CORE") == 0) {
-			U2UP_LOG_SET_SYSLOG2(EVM_CORE, 1);
-		} else
-		if (strcmp(module_token->eqval, "EVM_MSGS") == 0) {
-			U2UP_LOG_SET_SYSLOG2(EVM_MSGS, 1);
-		} else
-		if (strcmp(module_token->eqval, "EVM_TMRS") == 0) {
-			U2UP_LOG_SET_SYSLOG2(EVM_TMRS, 1);
-		} else
-#endif
-		if (strcmp(module_token->eqval, "U2NETCLI") == 0) {
-			U2UP_LOG_SET_SYSLOG2(U2NETCLI, 1);
-		} else
-		if (strcmp(module_token->eqval, "U2CLISRV") == 0) {
-			U2UP_LOG_SET_SYSLOG2(U2CLISRV, 1);
-		}
+		return u2up_log_set(module_token->eqval, "syslog");
 	} else
 	if ((header_token = getCurrentToken(curr_tokens, "header")) != NULL) {
 		printf("log set handle called (header)!'\n");
-#if 0 /*need to be sent to the main thread*/
-		if (strcmp(module_token->eqval, "U2NETSIM") == 0) {
-			U2UP_LOG_SET_HEADER2(U2NETSIM, 1);
-		} else
-		if (strcmp(module_token->eqval, "EVM_CORE") == 0) {
-			U2UP_LOG_SET_HEADER2(EVM_CORE, 1);
-		} else
-		if (strcmp(module_token->eqval, "EVM_MSGS") == 0) {
-			U2UP_LOG_SET_HEADER2(EVM_MSGS, 1);
-		} else
-		if (strcmp(module_token->eqval, "EVM_TMRS") == 0) {
-			U2UP_LOG_SET_HEADER2(EVM_TMRS, 1);
-		} else
-#endif
-		if (strcmp(module_token->eqval, "U2NETCLI") == 0) {
-			U2UP_LOG_SET_HEADER2(U2NETCLI, 1);
-		} else
-		if (strcmp(module_token->eqval, "U2CLISRV") == 0) {
-			U2UP_LOG_SET_HEADER2(U2CLISRV, 1);
-		}
+		return u2up_log_set(module_token->eqval, "header");
 	} else
 		printf("log set handle called (missing parameter)!'\n");
 
@@ -312,6 +198,37 @@ static int log_reset_handle(clisrv_token_struct *curr_tokens, char *buff, int si
 	clisrv_token_struct *syslog_token;
 	clisrv_token_struct *header_token;
 
+	if ((module_token = getCurrentToken(curr_tokens, "module")) != NULL) {
+		if ((module_token->eqval != NULL) && (strlen(module_token->eqval) > 0)) {
+			printf("log reset handle called (module=%s)!'\n", module_token->eqval);
+		}
+	}
+
+	if ((quiet_token = getCurrentToken(curr_tokens, "quiet")) != NULL) {
+		printf("log reset handle called (quiet)!'\n");
+		return u2up_log_reset(module_token->eqval, "quiet");
+	} else
+	if ((verbose_token = getCurrentToken(curr_tokens, "verbose")) != NULL) {
+		printf("log reset handle called (verbose)!'\n");
+		return u2up_log_reset(module_token->eqval, "verbose");
+	} else
+	if ((trace_token = getCurrentToken(curr_tokens, "trace")) != NULL) {
+		printf("log reset handle called (trace)!'\n");
+		return u2up_log_reset(module_token->eqval, "trace");
+	} else
+	if ((debug_token = getCurrentToken(curr_tokens, "debug")) != NULL) {
+		printf("log reset handle called (debug)!'\n");
+		return u2up_log_reset(module_token->eqval, "debug");
+	} else
+	if ((syslog_token = getCurrentToken(curr_tokens, "syslog")) != NULL) {
+		printf("log reset handle called (syslog)!'\n");
+		return u2up_log_reset(module_token->eqval, "syslog");
+	} else
+	if ((header_token = getCurrentToken(curr_tokens, "header")) != NULL) {
+		printf("log reset handle called (header)!'\n");
+		return u2up_log_reset(module_token->eqval, "header");
+	} else
+		printf("log reset handle called (missing parameter)!'\n");
 	return 0;
 }
 

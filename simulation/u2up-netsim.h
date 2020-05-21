@@ -102,6 +102,9 @@ typedef struct u2up_net_ring_head {
 
 int set_dump_filename_prefix(char *prefix);
 int u2up_dump_u2up_net_ring(char *buff, int size);
+int u2up_log_list_modules(char *buff, int size);
+int u2up_log_set(char *module, char *param);
+int u2up_log_reset(char *module, char *param);
 int disableNodeById(unsigned int id);
 int enableNodeById(unsigned int id);
 int enableAllNodes(void);
