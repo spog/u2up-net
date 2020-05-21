@@ -72,39 +72,33 @@ static sigset_t clisrv_sigmask;
 static char *clisrv_cmds[] = {
 	"help",
 	"dump [prefix=%s]",
-	"node disable {addr=%8x | id=%u}",
+	"log list {modules}",
+	"log set {module=%s} {quiet|verbose|trace|debug|syslog|header}",
+	"log reset {module=%s} {quiet|verbose|trace|debug|syslog|header}",
 	"node enable {all | addr=%8x | id=%u}",
+	"node disable {addr=%8x | id=%u}",
 	"quit",
-#if 0 /*test*/
-	"test1 {a|b c|d}",
-	"test2 {a} {b} {c}",
-	"test3 {a=%d | b|c}|{d | e}",
-#endif
 	NULL
 };
 
 static int help_handle(clisrv_token_struct *curr_tokens, char *buff, int size);
 static int dump_handle(clisrv_token_struct *curr_tokens, char *buff, int size);
-static int node_disable_handle(clisrv_token_struct *curr_tokens, char *buff, int size);
+static int log_list_handle(clisrv_token_struct *curr_tokens, char *buff, int size);
+static int log_set_handle(clisrv_token_struct *curr_tokens, char *buff, int size);
+static int log_reset_handle(clisrv_token_struct *curr_tokens, char *buff, int size);
 static int node_enable_handle(clisrv_token_struct *curr_tokens, char *buff, int size);
+static int node_disable_handle(clisrv_token_struct *curr_tokens, char *buff, int size);
 static int quit_handle(clisrv_token_struct *curr_tokens, char *buff, int size);
-#if 0 /*test*/
-static int test1_handle(clisrv_token_struct *curr_tokens, char *buff, int size);
-static int test2_handle(clisrv_token_struct *curr_tokens, char *buff, int size);
-static int test3_handle(clisrv_token_struct *curr_tokens, char *buff, int size);
-#endif
 
 static int (*cmd_handle[])(clisrv_token_struct *curr_tokens, char *buff, int size) = {
 	help_handle,
 	dump_handle,
-	node_disable_handle,
+	log_list_handle,
+	log_set_handle,
+	log_reset_handle,
 	node_enable_handle,
+	node_disable_handle,
 	quit_handle,
-#if 0 /*test*/
-	test1_handle,
-	test2_handle,
-	test3_handle,
-#endif
 };
 
 static int help_handle(clisrv_token_struct *curr_tokens, char *buff, int size)
@@ -135,6 +129,192 @@ static int dump_handle(clisrv_token_struct *curr_tokens, char *buff, int size)
 	return 0;
 }
 
+static int log_list_handle(clisrv_token_struct *curr_tokens, char *buff, int size)
+{
+	clisrv_token_struct *modules_token;
+
+	if ((modules_token = getCurrentToken(curr_tokens, "modules")) != NULL) {
+		printf("log list handle called (modules)!'\n");
+		clisrv_strncat(buff, "Log modules:\n", size);
+		clisrv_strncat(buff, " U2NETSIM EVM_CORE EVM_MSGS EVM_TMRS U2NETCLI U2CLISRV", size);
+	} else
+		printf("log list handle called (missing parameter)!'\n");
+
+	return 0;
+}
+
+static int log_set_handle(clisrv_token_struct *curr_tokens, char *buff, int size)
+{
+	clisrv_token_struct *module_token;
+	clisrv_token_struct *quiet_token;
+	clisrv_token_struct *verbose_token;
+	clisrv_token_struct *trace_token;
+	clisrv_token_struct *debug_token;
+	clisrv_token_struct *syslog_token;
+	clisrv_token_struct *header_token;
+
+	if ((module_token = getCurrentToken(curr_tokens, "module")) != NULL) {
+		if ((module_token->eqval != NULL) && (strlen(module_token->eqval) > 0)) {
+			printf("log list handle called (module=%s)!'\n", module_token->eqval);
+		}
+	}
+
+	if ((quiet_token = getCurrentToken(curr_tokens, "quiet")) != NULL) {
+		printf("log set handle called (quiet)!'\n");
+#if 0 /*need to be sent to the main thread*/
+		if (strcmp(module_token->eqval, "U2NETSIM") == 0) {
+			U2UP_LOG_SET_QUIET2(U2NETSIM, 1);
+		} else
+		if (strcmp(module_token->eqval, "EVM_CORE") == 0) {
+			U2UP_LOG_SET_QUIET2(EVM_CORE, 1);
+		} else
+		if (strcmp(module_token->eqval, "EVM_MSGS") == 0) {
+			U2UP_LOG_SET_QUIET2(EVM_MSGS, 1);
+		} else
+		if (strcmp(module_token->eqval, "EVM_TMRS") == 0) {
+			U2UP_LOG_SET_QUIET2(EVM_TMRS, 1);
+		} else
+#endif
+		if (strcmp(module_token->eqval, "U2NETCLI") == 0) {
+			U2UP_LOG_SET_QUIET2(U2NETCLI, 1);
+		} else
+		if (strcmp(module_token->eqval, "U2CLISRV") == 0) {
+			U2UP_LOG_SET_QUIET2(U2CLISRV, 1);
+		}
+	} else
+	if ((verbose_token = getCurrentToken(curr_tokens, "verbose")) != NULL) {
+		printf("log set handle called (verbose)!'\n");
+#if 0 /*need to be sent to the main thread*/
+		if (strcmp(module_token->eqval, "U2NETSIM") == 0) {
+			U2UP_LOG_SET_VERBOSE2(U2NETSIM, 1);
+		} else
+		if (strcmp(module_token->eqval, "EVM_CORE") == 0) {
+			U2UP_LOG_SET_VERBOSE2(EVM_CORE, 1);
+		} else
+		if (strcmp(module_token->eqval, "EVM_MSGS") == 0) {
+			U2UP_LOG_SET_VERBOSE2(EVM_MSGS, 1);
+		} else
+		if (strcmp(module_token->eqval, "EVM_TMRS") == 0) {
+			U2UP_LOG_SET_VERBOSE2(EVM_TMRS, 1);
+		} else
+#endif
+		if (strcmp(module_token->eqval, "U2NETCLI") == 0) {
+			U2UP_LOG_SET_VERBOSE2(U2NETCLI, 1);
+		} else
+		if (strcmp(module_token->eqval, "U2CLISRV") == 0) {
+			U2UP_LOG_SET_VERBOSE2(U2CLISRV, 1);
+		}
+	} else
+	if ((trace_token = getCurrentToken(curr_tokens, "trace")) != NULL) {
+		printf("log set handle called (trace)!'\n");
+#if 0 /*need to be sent to the main thread*/
+		if (strcmp(module_token->eqval, "U2NETSIM") == 0) {
+			U2UP_LOG_SET_TRACE2(U2NETSIM, 1);
+		} else
+		if (strcmp(module_token->eqval, "EVM_CORE") == 0) {
+			U2UP_LOG_SET_TRACE2(EVM_CORE, 1);
+		} else
+		if (strcmp(module_token->eqval, "EVM_MSGS") == 0) {
+			U2UP_LOG_SET_TRACE2(EVM_MSGS, 1);
+		} else
+		if (strcmp(module_token->eqval, "EVM_TMRS") == 0) {
+			U2UP_LOG_SET_TRACE2(EVM_TMRS, 1);
+		} else
+#endif
+		if (strcmp(module_token->eqval, "U2NETCLI") == 0) {
+			U2UP_LOG_SET_TRACE2(U2NETCLI, 1);
+		} else
+		if (strcmp(module_token->eqval, "U2CLISRV") == 0) {
+			U2UP_LOG_SET_TRACE2(U2CLISRV, 1);
+		}
+	} else
+	if ((debug_token = getCurrentToken(curr_tokens, "debug")) != NULL) {
+		printf("log set handle called (debug)!'\n");
+#if 0 /*need to be sent to the main thread*/
+		if (strcmp(module_token->eqval, "U2NETSIM") == 0) {
+			U2UP_LOG_SET_DEBUG2(U2NETSIM, 1);
+		} else
+		if (strcmp(module_token->eqval, "EVM_CORE") == 0) {
+			U2UP_LOG_SET_DEBUG2(EVM_CORE, 1);
+		} else
+		if (strcmp(module_token->eqval, "EVM_MSGS") == 0) {
+			U2UP_LOG_SET_DEBUG2(EVM_MSGS, 1);
+		} else
+		if (strcmp(module_token->eqval, "EVM_TMRS") == 0) {
+			U2UP_LOG_SET_DEBUG2(EVM_TMRS, 1);
+		} else
+#endif
+		if (strcmp(module_token->eqval, "U2NETCLI") == 0) {
+			U2UP_LOG_SET_DEBUG2(U2NETCLI, 1);
+		} else
+		if (strcmp(module_token->eqval, "U2CLISRV") == 0) {
+			U2UP_LOG_SET_DEBUG2(U2CLISRV, 1);
+		}
+	} else
+	if ((syslog_token = getCurrentToken(curr_tokens, "syslog")) != NULL) {
+		printf("log set handle called (syslog)!'\n");
+#if 0 /*need tobe sent to the main thread*/
+		if (strcmp(module_token->eqval, "U2NETSIM") == 0) {
+			U2UP_LOG_SET_SYSLOG2(U2NETSIM, 1);
+		} else
+		if (strcmp(module_token->eqval, "EVM_CORE") == 0) {
+			U2UP_LOG_SET_SYSLOG2(EVM_CORE, 1);
+		} else
+		if (strcmp(module_token->eqval, "EVM_MSGS") == 0) {
+			U2UP_LOG_SET_SYSLOG2(EVM_MSGS, 1);
+		} else
+		if (strcmp(module_token->eqval, "EVM_TMRS") == 0) {
+			U2UP_LOG_SET_SYSLOG2(EVM_TMRS, 1);
+		} else
+#endif
+		if (strcmp(module_token->eqval, "U2NETCLI") == 0) {
+			U2UP_LOG_SET_SYSLOG2(U2NETCLI, 1);
+		} else
+		if (strcmp(module_token->eqval, "U2CLISRV") == 0) {
+			U2UP_LOG_SET_SYSLOG2(U2CLISRV, 1);
+		}
+	} else
+	if ((header_token = getCurrentToken(curr_tokens, "header")) != NULL) {
+		printf("log set handle called (header)!'\n");
+#if 0 /*need to be sent to the main thread*/
+		if (strcmp(module_token->eqval, "U2NETSIM") == 0) {
+			U2UP_LOG_SET_HEADER2(U2NETSIM, 1);
+		} else
+		if (strcmp(module_token->eqval, "EVM_CORE") == 0) {
+			U2UP_LOG_SET_HEADER2(EVM_CORE, 1);
+		} else
+		if (strcmp(module_token->eqval, "EVM_MSGS") == 0) {
+			U2UP_LOG_SET_HEADER2(EVM_MSGS, 1);
+		} else
+		if (strcmp(module_token->eqval, "EVM_TMRS") == 0) {
+			U2UP_LOG_SET_HEADER2(EVM_TMRS, 1);
+		} else
+#endif
+		if (strcmp(module_token->eqval, "U2NETCLI") == 0) {
+			U2UP_LOG_SET_HEADER2(U2NETCLI, 1);
+		} else
+		if (strcmp(module_token->eqval, "U2CLISRV") == 0) {
+			U2UP_LOG_SET_HEADER2(U2CLISRV, 1);
+		}
+	} else
+		printf("log set handle called (missing parameter)!'\n");
+
+	return 0;
+}
+
+static int log_reset_handle(clisrv_token_struct *curr_tokens, char *buff, int size)
+{
+	clisrv_token_struct *module_token;
+	clisrv_token_struct *quiet_token;
+	clisrv_token_struct *verbose_token;
+	clisrv_token_struct *trace_token;
+	clisrv_token_struct *debug_token;
+	clisrv_token_struct *syslog_token;
+	clisrv_token_struct *header_token;
+
+	return 0;
+}
+
 static int node_disable_handle(clisrv_token_struct *curr_tokens, char *buff, int size)
 {
 	clisrv_token_struct *addr_token;
@@ -146,7 +326,7 @@ static int node_disable_handle(clisrv_token_struct *curr_tokens, char *buff, int
 		if ((addr_token->eqval != NULL) && (strlen(addr_token->eqval) > 0)) {
 			sscanf(addr_token->eqval, addr_token->eqspec, &addr);
 		}
-		printf("disable command handle called (addr=%8x)!'\n", addr);
+		printf("node disable command handle called (addr=%8x)!'\n", addr);
 		if (getNodeIdByAddr(addr, &id) != 0) {
 			clisrv_strncat(buff, "error: node id by addr not found!", size);
 			return 0;
@@ -156,13 +336,13 @@ static int node_disable_handle(clisrv_token_struct *curr_tokens, char *buff, int
 		if ((id_token->eqval != NULL) && (strlen(id_token->eqval) > 0)) {
 			sscanf(id_token->eqval, id_token->eqspec, &id);
 		}
-		printf("disable command handle called (id=%u)!'\n", id);
+		printf("node disable command handle called (id=%u)!'\n", id);
 		if (getNodeFirstAddrById(id, &addr) != 0) {
 			clisrv_strncat(buff, "error: node addr by id not found!", size);
 			return 0;
 		}
 	}
-	printf("disable command handle called (addr=%8x, id=%u)!'\n", addr, id);
+	printf("node disable command handle called (addr=%8x, id=%u)!'\n", addr, id);
 
 	if (disableNodeById(id) != 0)
 		snprintf(buff, size, "error: failed to disable node id=%u (addr=%.8x)!", id, addr);
@@ -181,7 +361,7 @@ static int node_enable_handle(clisrv_token_struct *curr_tokens, char *buff, int 
 	unsigned int id;
 
 	if ((all_token = getCurrentToken(curr_tokens, "all")) != NULL) {
-		printf("enable command handle called (all)!'\n");
+		printf("node enable command handle called (all)!'\n");
 		if (enableAllNodes() != 0)
 			snprintf(buff, size, "error: failed to enable all nodes!");
 		else
@@ -192,7 +372,7 @@ static int node_enable_handle(clisrv_token_struct *curr_tokens, char *buff, int 
 		if ((addr_token->eqval != NULL) && (strlen(addr_token->eqval) > 0)) {
 			sscanf(addr_token->eqval, addr_token->eqspec, &addr);
 		}
-		printf("enable command handle called (addr=%8x)!'\n", addr);
+		printf("node enable command handle called (addr=%8x)!'\n", addr);
 		if (getNodeIdByAddr(addr, &id) != 0) {
 			clisrv_strncat(buff, "error: node id by addr not found!", size);
 			return 0;
@@ -202,13 +382,13 @@ static int node_enable_handle(clisrv_token_struct *curr_tokens, char *buff, int 
 		if ((id_token->eqval != NULL) && (strlen(id_token->eqval) > 0)) {
 			sscanf(id_token->eqval, id_token->eqspec, &id);
 		}
-		printf("enable command handle called (id=%u)!'\n", id);
+		printf("node enable command handle called (id=%u)!'\n", id);
 		if (getNodeFirstAddrById(id, &addr) != 0) {
 			clisrv_strncat(buff, "error: node addr by id not found!", size);
 			return 0;
 		}
 	}
-	printf("enable command handle called (addr=%8x, id=%u)!'\n", addr, id);
+	printf("node enable command handle called (addr=%8x, id=%u)!'\n", addr, id);
 
 	if (enableNodeById(id) != 0)
 		snprintf(buff, size, "error: failed to enable node id=%u (addr=%.8x)!", id, addr);
@@ -223,26 +403,6 @@ static int quit_handle(clisrv_token_struct *curr_tokens, char *buff, int size)
 	printf("quit command handle called!'\n");
 	return 127;
 }
-
-#if 0 /*test*/
-static int test1_handle(clisrv_token_struct *curr_tokens, char *buff, int size)
-{
-	printf("test1 command handle called!'\n");
-	return 0;
-}
-
-static int test2_handle(clisrv_token_struct *curr_tokens, char *buff, int size)
-{
-	printf("test2 command handle called!'\n");
-	return 0;
-}
-
-static int test3_handle(clisrv_token_struct *curr_tokens, char *buff, int size)
-{
-	printf("test3 command handle called!'\n");
-	return 0;
-}
-#endif
 
 static int evClisrvInitMsg(evmConsumerStruct *consumer, evmMessageStruct *msg)
 {

@@ -76,9 +76,9 @@ static void usage_help(char *argv[])
 	printf("\t%s [options]\n", argv[0]);
 	printf("options:\n");
 	printf("\t-a, --auto-dump          Automatically dump u2up network ring on node changes.\n");
-	printf("\t-b, --batch-nodes        Number of nodes to be created in a batch (default=%u).\n", batch_nodes);
-	printf("\t-m, --max-nodes          Maximum number of all nodes to be created (default=%u).\n", max_nodes);
-	printf("\t-o, --outfile            Output [path/]filename prefix (default=%s).\n", default_outfile);
+	printf("\t-b, --batch-nodes NUM    Number of nodes to be created in a batch (default=%u).\n", batch_nodes);
+	printf("\t-m, --max-nodes NUM      Maximum number of all nodes to be created (default=%u).\n", max_nodes);
+	printf("\t-o, --outfile PREFIX     Output [path/]filename prefix (default=%s).\n", default_outfile);
 	printf("\t-q, --log-quiet          Disable all output.\n");
 	printf("\t-v, --log-verbose        Enable verbose output.\n");
 #if (U2UP_LOG_MODULE_TRACE != 0)

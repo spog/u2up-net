@@ -51,18 +51,18 @@ static void usage_help(char *argv[])
 	printf("Usage:\n");
 	printf("\t%s [options]\n", argv[0]);
 	printf("options:\n");
-	printf("\t-c, --cmd                Execute command and exit.");
-	printf("\t-q, --quiet              Disable all output.\n");
-	printf("\t-v, --verbose            Enable verbose output.\n");
+	printf("\t-c, --cmd          Execute command and exit.\n");
+	printf("\t-q, --quiet        Disable all output.\n");
+	printf("\t-v, --verbose      Enable verbose output.\n");
 #if (U2UP_LOG_MODULE_TRACE != 0)
-	printf("\t-t, --trace              Enable trace output.\n");
+	printf("\t-t, --trace        Enable trace output.\n");
 #endif
 #if (U2UP_LOG_MODULE_DEBUG != 0)
-	printf("\t-g, --debug              Enable debug output.\n");
+	printf("\t-g, --debug        Enable debug output.\n");
 #endif
-	printf("\t-s, --syslog             Redirect U2UP_LOG output to syslog (instead of stdout, stderr).\n");
-	printf("\t-n, --no-header          No U2UP_LOG header added to every u2up_log_... output.\n");
-	printf("\t-h, --help               Displays this text.\n");
+	printf("\t-s, --syslog       Redirect U2UP_LOG output to syslog (instead of stdout, stderr).\n");
+	printf("\t-n, --no-header    No U2UP_LOG header added to every u2up_log_... output.\n");
+	printf("\t-h, --help         Displays this text.\n");
 }
 
 static int usage_check(int argc, char *argv[])
