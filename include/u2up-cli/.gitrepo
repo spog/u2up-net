@@ -1,0 +1,12 @@
+; DO NOT EDIT (unless you know what you are doing)
+;
+; This subdirectory is a git "subrepo", and this file is maintained by the
+; git-subrepo command. See https://github.com/git-commands/git-subrepo#readme
+;
+[subrepo]
+	remote = https://github.com/spog/u2up-cli
+	branch = master
+	commit = bdcea8194da41557c51cc162f63e76d5ed7a0137
+	parent = 68aa1624cddfa60e66ee6c98ff6268a46730361c
+	method = merge
+	cmdver = 0.4.1
