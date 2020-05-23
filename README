@@ -53,5 +53,70 @@ $ git clean -d -f -x
 
 Simulation:
 ===========
+$ ./u2up-netsim -h
+Usage:
+	./u2up-netsim [options]
+options:
+	-a, --auto-dump          Automatically dump u2up network ring on node changes.
+	-b, --batch-nodes NUM    Number of nodes to be created in a batch (default=1).
+	-m, --max-nodes NUM      Maximum number of all nodes to be created (default=10).
+	-o, --outfile PREFIX     Output [path/]filename prefix (default=./dump-net-ring).
+	-q, --log-quiet          Disable all output.
+	-v, --log-verbose        Enable verbose output.
+	-t, --log-trace          Enable trace output.
+	-g, --log-debug          Enable debug output.
+	-s, --log-syslog         Enable syslog output (instead of stdout, stderr).
+	-n, --log-no-header      No U2UP_LOG header added to every u2up_log_... output.
+	-f, --log-filter NAME    Disable outout from U2UP_LOG module NAME prefix.
+	-h, --help               Displays this text.
+$ 
+$ ./u2up-netsim -b 2 -m 10
+batch-nodes: optarg=2
+max-nodes: optarg=10
+batch_nodes = 2
+max_nodes = 10
+outfile = ./dump-net-ring
+start_time = 2020-05-23-1847
+[94291.239380|6715|U2NETSIM] AUTH_BATCH timer set: 1 s
+[94292.239508|6715|U2NETSIM] (0 nodes)
+[94293.239792|6715|U2NETSIM] (2 nodes)
+[94294.240624|6715|U2NETSIM] (4 nodes)
+[94295.240996|6715|U2NETSIM] (6 nodes)
+[94296.241264|6715|U2NETSIM] (8 nodes)
+[94296.241401|6715|U2NETSIM] (all 10 nodes created)
 ...
+
+
+$ ./u2up-netsim-cli -h
+Usage:
+	./u2up-netsim-cli [options]
+options:
+	-c, --cmd          Execute command and exit.
+	-q, --quiet        Disable all output.
+	-v, --verbose      Enable verbose output.
+	-t, --trace        Enable trace output.
+	-g, --debug        Enable debug output.
+	-s, --syslog       Redirect U2UP_LOG output to syslog (instead of stdout, stderr).
+	-n, --no-header    No U2UP_LOG header added to every u2up_log_... output.
+	-h, --help         Displays this text.
+$ 
+$ ./u2up-netsim-cli 
+netsim-cli>  
+netsim-cli> help
+
+Press TAB-TAB to display all available commands.
+Use TAB for auto-complete.
+Use TAB-TAB for auto-suggest.
+Use UP and DOWN keys to walk the commands history.
+
+netsim-cli>  
+netsim-cli>  
+help
+dump
+log
+node
+quit
+netsim-cli>  
+netsim-cli> quit  
+Bye...
 
