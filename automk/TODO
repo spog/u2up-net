@@ -1,0 +1,4 @@
+- Add config to exclude/include modules/subdirs.
+
+Done:
+- make clean

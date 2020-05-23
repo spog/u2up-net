@@ -1,0 +1,12 @@
+; DO NOT EDIT (unless you know what you are doing)
+;
+; This subdirectory is a git "subrepo", and this file is maintained by the
+; git-subrepo command. See https://github.com/git-commands/git-subrepo#readme
+;
+[subrepo]
+	remote = https://github.com/spog/automk
+	branch = master
+	commit = 2fc3e32f7d2236dfd9e39d93f38a8d52a3624287
+	parent = b2e27cca929f1b24233d6ef7113227d1769748b9
+	method = merge
+	cmdver = 0.4.1

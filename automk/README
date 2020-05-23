@@ -1,0 +1,58 @@
+The "automk" make/bash template project
+=======================================
+
+--------------------------------------------------------------------
+Copyright (C) 2017 Samo Pogacnik <samo_pogacnik@t-2.net>
+All rights reserved.
+
+The "automk" software project is provided under the terms of the
+BSD 3-Clause license, which is available in the LICENSE file of this
+project.
+--------------------------------------------------------------------
+
+Description:
+------------
+The "automk" project serves as a template for building software projects.
+It provides a framework to help adding build rules to your source tree.
+
+Usage:
+------
+To able to use this template, copy the "automk" subdirectory into the
+home directory of your source tree (you may also create symlinks to
+create initial "configure" and "Makefile" like in this template example).
+
+You need to add a "config.mk" file to each subdirectory of your
+source tree. A "config.mk" variable "SUBMAKES" has to be defined to
+specify all current directory specific target make files and subdirectories
+required to dive into. Order of target make files and subdirectories in a
+current "config.mk" also define build order of those targets.
+
+For each specific target make file, targets "all", "clean" and "install"
+need to be defined (check this template samples).
+
+It automatically adds out-of-tree build capability to your projects.
+
+Build commands:
+"Configure":
+~~~~~~~~~~~~
+project_home$ env BUILDIR=./build PREFIX=/usr/local ./configure
+
+or (using cross-toolchain)
+
+project_home$ env BUILDIR=./build PREFIX=/usr/local ENVSH=/home/samo/Yocto-RPI3/eSDK/environment-setup-cortexa7hf-neon-vfpv4-poky-linux-gnueabi ./configure
+
+"Build":
+~~~~~~~~
+project_home$ make
+
+"Install":
+~~~~~~~~~~
+project_home$ env DESTDIR=$(pwd)/../install make install
+
+"Clean":
+~~~~~~~~
+project_home$ make clean
+
+---
+End!
+

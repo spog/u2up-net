@@ -1,0 +1,227 @@
+#!/bin/bash
+#
+# The "automk" project build rules
+#
+# Copyright (C) 2017-2018 Samo Pogacnik <samo_pogacnik@t-2.net>
+# All rights reserved.
+#
+# This file is part of the "automk" software project.
+# This file is provided under the terms of the BSD 3-Clause license,
+# available in the LICENSE file of the "automk" software project.
+#
+#set -x
+set -e
+
+answer=""
+
+function usage_help ()
+{
+	echo
+	echo -n "Usage: "$(basename  $0)
+	echo " OPTIONS"
+	echo
+	echo "OPTIONS:"
+	echo " [{--answer=|-a=|-y|-n}]"
+	echo " [{--help|-h}]"
+	echo
+	return
+}
+
+while [[ $# > 0 ]]
+do
+#	echo "AAAAAAA:$#"
+#	echo "aaaaaaa:$1"
+	case $1 in
+	--answer=*|-a=*)
+		answer="${1#*=}"
+		;;
+	-y|-n)
+		answer="${1#*-}"
+		;;
+	--help|-h)
+		usage_help
+		exit 0
+		;;
+	*)
+		# comp_home_dir or unknown option
+		if [ "x"$comp_home_dir == "x" ]
+		then
+			if [ -d $1 ]
+			then
+				comp_home_dir=$1
+			else
+				echo "${pre}ERROR: Unknown option: "$1
+				usage_help
+			fi
+		else
+			echo "${pre}ERROR: Unknown option: "$1
+			usage_help
+		fi
+		exit 1
+		;;
+	esac
+	set +e; shift; set -e # to the next token, if any
+done
+
+if [ "x"$SRCDIR != "x" ];
+then
+	cd $SRCDIR
+else
+	cd $(dirname $(which $0))
+fi
+export _SRCDIR_=$(pwd)
+export SRCDIR="."
+cd - > /dev/null
+echo "Sources absolute path (_SRCDIR_): "$_SRCDIR_
+
+if [ "x"$BUILDIR != "x" ];
+then
+	if [ -d "${BUILDIR}" ]; then
+		cd $BUILDIR
+		_BUILDIR_=$(pwd)
+		cd - > /dev/null
+	else
+		mkdir -p $BUILDIR
+		cd $BUILDIR
+		_BUILDIR_=$(pwd)
+		cd - > /dev/null
+		rmdir $BUILDIR
+	fi
+else
+	_BUILDIR_=$(pwd)
+fi
+export _BUILDIR_
+export BUILDIR=".build/"
+echo "Build absolute path (_BUILDIR_): "$_BUILDIR_
+echo "Sources relative path (SRCDIR): "$SRCDIR
+echo "Build relative path (BUILDIR): "$BUILDIR
+
+if [ "x"$PREFIX == "x" ]
+then
+	PREFIX="/"
+	echo "Target absolute installation prefix path (PREFIX): "$PREFIX
+else
+	echo "Target absolute installation prefix path (PREFIX): "$PREFIX
+	if [ "/" != $(echo $PREFIX | sed -e 's%^/.*%/%') ];
+	then
+		echo "ERROR: Target installation path PREFIX is not absolute!"
+		echo
+		echo "ABORTING configure..."
+		echo
+		exit 1
+	fi
+fi
+export PREFIX
+
+if [ "x"$DESTDIR == "x" ]
+then
+	echo "--"
+	echo "Later (in the installation command), you may provide additional absolute"
+	echo "target installation path prefix via the DESTDIR environment variable!"
+	echo "--"
+else
+	echo "Additional absolute target installation path prefix (DESTDIR): "$DESTDIR
+	if [ "/" != $(echo $DESTDIR | sed -e 's%^/.*%/%') ];
+	then
+		echo "ERROR: Additional target installation path DESTDIR is not absolute!"
+		echo
+		echo "ABORTING configure..."
+		echo
+		exit 1
+	fi
+	export DESTDIR
+fi
+
+RECONFIG=n
+if [ -f $_BUILDIR_/auto.mk ];
+then
+	echo "WARNING: Build path already configured!"
+	echo -n " Re-configure existing build path (y/n)? "
+	input=""
+	if [ -z "${answer}" ]; then
+		read input
+	else
+		echo "Option provided '${answer}'!"
+		input=$answer
+	fi
+	case $input in
+	y|Y)
+		RECONFIG=y
+		echo
+		echo "RE-configure..."
+		echo
+		;;
+	*)
+		echo
+		echo "FRESH configure..."
+		echo
+#		exit 1
+		;;
+	esac
+fi
+
+if [ -d "${_BUILDIR_}" ] && [ "x${RECONFIG}" != "xy" ]; then
+	if [ "x${_SRCDIR_#$_BUILDIR_}" != "x${_SRCDIR_}" ]; then
+		if [ "x${_BUILDIR_}" != "x${_SRCDIR_}" ]; then
+			echo "Build directory is a subdirectory of sources directory!"
+			echo "!!! DO NOT REMOVE BUILD & ABORT configure !!!"
+			echo
+			exit 1
+		else
+			echo "Build directory equals to sources directory!"
+			echo "!!! DO NOT REMOVE BUILD & CONTINUE to configure !!!"
+			echo
+		fi
+	else
+		echo "The build directory is going to be removed and re-created!"
+		echo -n " Remove existing build path: ${_BUILDIR_} (y/n)? "
+		input=""
+		if [ -z "${answer}" ]; then
+			read input
+		else
+			echo "Option provided '${answer}'!"
+			input=$answer
+		fi
+		case $input in
+		y|Y)
+			echo
+			;;
+		*)
+			echo
+			echo "ABORTING configure..."
+			echo
+			exit 1
+			;;
+		esac
+		echo "Removing the build directory..."
+		rm -rf $_BUILDIR_
+		echo "Re-creating the build directory..."
+		mkdir -p $_BUILDIR_
+	fi
+else
+	echo "Creating the build directory..."
+	mkdir -p $_BUILDIR_
+fi
+
+cd $_SRCDIR_
+rm -f .build
+ln -s $_BUILDIR_ .build
+rm -f $_BUILDIR_/.sources
+ln -s $_SRCDIR_ $_BUILDIR_/.sources
+
+if [ -n "${ENVSH}" ] && [ -f "${ENVSH}" ]; then
+	export ENVSH
+	echo
+	echo "Extra build environment shell script: ${ENVSH}"
+	source $ENVSH
+	echo
+else
+	export ENVSH=none
+	echo
+	echo "No extra environment shell script provided to configure!"
+	echo
+fi
+
+export MAKE=$(which make)
+$MAKE -B -C $_SRCDIR_ -f $_SRCDIR_/automk/configure.mk configure
+
