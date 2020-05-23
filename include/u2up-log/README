@@ -1,0 +1,18 @@
+The "u2up-log" logging support software project
+===============================================
+
+--------------------------------------------------------------------
+   Copyright 2019 Samo Pogacnik <samo_pogacnik@t-2.net>
+
+The "u2up-log" software project is provided under the terms of the
+Apache License, Version 2.0, which is available in the LICENSE file
+of this project.
+--------------------------------------------------------------------
+
+The "u2up-log" (Logging support) software consists of C code written
+as header files to be included statically into your C sources.
+
+Features:
+=========
+- ...
+
