@@ -37,4 +37,16 @@ static inline char * clisrv_strncat(char *dst, const char *src, int dstsz)
 	return dst;
 }
 
+static inline void * clisrv_realloc(void *ptr, size_t nmemb, size_t size)
+{
+	size_t tmp = nmemb * size;
+
+	if ((nmemb > 0) && ((tmp / nmemb) != size)) {
+		/* multiplication overflow: return NULL! */
+		return NULL;
+	}
+
+	return realloc(ptr, tmp);
+}
+
 #endif /*U2UP_CLI_FILE_u2up_cli_h*/

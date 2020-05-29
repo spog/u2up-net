@@ -869,7 +869,11 @@ static int tokenizeCmdLine(clisrv_pconn_struct *pconn)
 		return -1;
 	}
 #if 1
+#if 0 /*orig*/
 	if ((tmp = (char *)reallocarray(pconn->tokens, (pconn->rcvlen + 1), sizeof(char))) == NULL) {
+#else
+	if ((tmp = (char *)clisrv_realloc(pconn->tokens, (pconn->rcvlen + 1), sizeof(char))) == NULL) {
+#endif
 		u2up_log_return_system_err("realocarray() - tokens\n");
 	}
 #else
@@ -1680,7 +1684,11 @@ static int parseReceivedData(clisrv_pconn_struct *pconn, char *data, int datasz 
 		return -1;
 	}
 
+#if 0 /*orig*/
 	if ((tmp = (char *)reallocarray(pconn->rcv, datasz, sizeof(char))) == NULL) {
+#else
+	if ((tmp = (char *)clisrv_realloc(pconn->rcv, datasz, sizeof(char))) == NULL) {
+#endif
 		u2up_log_system_error("realocarray() - rcv\n");
 		abort();
 	}
@@ -1688,7 +1696,11 @@ static int parseReceivedData(clisrv_pconn_struct *pconn, char *data, int datasz 
 	memcpy(tmp, data, datasz);
 	pconn->rcvlen = datasz - 1;
 
+#if 0 /*orig*/
 	if ((tmp = (char *)reallocarray(pconn->snd, CLISRV_MAX_MSGSZ, sizeof(char))) == NULL) {
+#else
+	if ((tmp = (char *)clisrv_realloc(pconn->snd, CLISRV_MAX_MSGSZ, sizeof(char))) == NULL) {
+#endif
 		u2up_log_system_error("realocarray() - snd\n");
 		abort();
 	}

@@ -6,7 +6,7 @@
 [subrepo]
 	remote = https://github.com/spog/u2up-cli
 	branch = master
-	commit = bdcea8194da41557c51cc162f63e76d5ed7a0137
-	parent = 68aa1624cddfa60e66ee6c98ff6268a46730361c
+	commit = 0bedc81fda3c248ae40947a9f43fcd6e1449c4b8
+	parent = 6d5a9ecdd6803f5addaae5b2a68c7fb1f531f5f0
 	method = merge
 	cmdver = 0.4.1

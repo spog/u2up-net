@@ -585,7 +585,7 @@ static int evaluate1char_sequence(char *const line, int i, char *const rline, in
 			u2up_log_debug("Key TAB pressed\n");
 			i++;
 		} else
-		if (line[i] == 127) {
+		if ((line[i] == 8) || (line[i] == 127)) {
 			u2up_log_debug("Key BACKSPACE pressed\n");
 			line[i] = '\0';
 			if (i > 0) {
