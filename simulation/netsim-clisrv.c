@@ -398,7 +398,11 @@ void * clisrv_ppoll_loop(void *arg)
 
 					/* New incoming connection - extend the pollfd structure */
 					u2up_log_debug("New incoming connection - %d\n", new_sd);
+#if 0 /*orig*/
 					if ((newClisrvFds = (struct pollfd *)reallocarray(clisrvFds, clisrvNfds + 1, sizeof(struct pollfd))) == NULL) {
+#else
+					if ((newClisrvFds = (struct pollfd *)clisrv_realloc(clisrvFds, clisrvNfds + 1, sizeof(struct pollfd))) == NULL) {
+#endif
 						u2up_log_system_error("realocarray() - clisrvFds\n");
 						end_server = U2UP_CLI_TRUE;
 						break;
@@ -406,7 +410,11 @@ void * clisrv_ppoll_loop(void *arg)
 					clisrvFds = newClisrvFds;
 					clisrvFds[clisrvNfds].fd = new_sd;
 					clisrvFds[clisrvNfds].events = POLLIN;
+#if 0 /*orig*/
 					if ((newClisrvConns = (struct clisrv_conn *)reallocarray(clisrvConns, clisrvNfds + 1, sizeof(struct clisrv_conn))) == NULL) {
+#else
+					if ((newClisrvConns = (struct clisrv_conn *)clisrv_realloc(clisrvConns, clisrvNfds + 1, sizeof(struct clisrv_conn))) == NULL) {
+#endif
 						u2up_log_system_error("realocarray() - clisrvConns\n");
 						end_server = U2UP_CLI_TRUE;
 						break;
